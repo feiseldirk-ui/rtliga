@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>RTLiga</title>
+    <script>
+      (function () {
+        const l = window.location;
+        const repoBase = "/rtliga";
+        const path = l.pathname.replace(repoBase, "") + l.search;
+        const encoded = path.replace(/&/g, "~and~");
+        l.replace(
+          l.protocol +
+            "//" +
+            l.hostname +
+            (l.port ? ":" + l.port : "") +
+            repoBase +
+            "/?p=" +
+            encoded +
+            l.hash
+        );
+      })();
+    </script>
+  </head>
+  <body>
+    <p>Weiterleitung…</p>
+  </body>
+</html>

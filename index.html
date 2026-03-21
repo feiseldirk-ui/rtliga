@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/rtliga/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RTLiga</title>
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        const path = params.get("p");
+        if (!path) return;
+
+        const normalized = path.startsWith("/") ? path : "/" + path;
+        const restoredPath = normalized.replace(/~and~/g, "&");
+        window.history.replaceState(null, "", restoredPath + window.location.hash);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

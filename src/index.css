@@ -1,0 +1,172 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply antialiased text-zinc-900;
+    @apply bg-[radial-gradient(1200px_circle_at_15%_0%,rgba(99,102,241,0.14),transparent_55%),radial-gradient(900px_circle_at_85%_10%,rgba(16,185,129,0.10),transparent_55%),linear-gradient(to_bottom,#fafafa,#ffffff,#f4f4f5)];
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-zinc-200/80 bg-white;
+    @apply shadow-[0_1px_2px_rgba(16,24,40,0.06),0_10px_28px_rgba(16,24,40,0.06)];
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-zinc-300/80 bg-white px-4 py-2.5 text-sm text-zinc-900;
+    @apply placeholder:text-zinc-400 outline-none transition-all duration-200;
+    @apply shadow-[inset_0_1px_0_rgba(255,255,255,0.7)];
+  }
+
+  .input:hover {
+    @apply border-indigo-400/90 shadow-[0_0_0_3px_rgba(99,102,241,0.08)];
+  }
+
+  .input:focus {
+    @apply border-indigo-500 ring-2 ring-indigo-500/25 shadow-[0_0_0_4px_rgba(99,102,241,0.14)];
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold;
+    @apply transition-all duration-200;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 focus-visible:ring-offset-2;
+    @apply disabled:pointer-events-none disabled:opacity-60;
+    @apply ring-offset-white;
+  }
+
+  .btn-primary {
+    @apply btn bg-indigo-600 text-white;
+    @apply shadow-[0_12px_26px_rgba(99,102,241,0.22)];
+    @apply hover:-translate-y-[1px] hover:bg-indigo-500 hover:shadow-[0_18px_36px_rgba(99,102,241,0.26)];
+    @apply active:translate-y-0;
+  }
+
+  .btn-secondary {
+    @apply btn border border-zinc-200 bg-white text-zinc-900;
+    @apply shadow-[0_1px_2px_rgba(16,24,40,0.06)];
+    @apply hover:-translate-y-[1px] hover:bg-zinc-50 hover:shadow-[0_12px_24px_rgba(16,24,40,0.08)];
+    @apply active:translate-y-0;
+  }
+
+  .btn-action {
+    @apply btn border border-zinc-200 bg-white text-zinc-900;
+    @apply shadow-[0_1px_2px_rgba(16,24,40,0.06)];
+    @apply hover:-translate-y-[1px] hover:border-indigo-500 hover:bg-indigo-600 hover:text-white;
+    @apply hover:shadow-[0_18px_36px_rgba(99,102,241,0.22)];
+    @apply active:translate-y-0;
+  }
+
+  .btn-mini {
+    @apply inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold;
+    @apply border border-zinc-200 bg-white text-zinc-900;
+    @apply shadow-[0_1px_2px_rgba(16,24,40,0.06)];
+    @apply transition-all duration-200;
+    @apply hover:bg-zinc-50 hover:shadow-[0_10px_22px_rgba(16,24,40,0.08)];
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 focus-visible:ring-offset-2;
+    @apply disabled:pointer-events-none disabled:opacity-60;
+    @apply ring-offset-white;
+  }
+
+  .tab-btn {
+    @apply inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold;
+    @apply transition-all duration-200;
+    @apply border border-zinc-200 bg-white text-zinc-900;
+    @apply shadow-[0_1px_2px_rgba(16,24,40,0.06)];
+    @apply hover:bg-zinc-50 hover:shadow-[0_10px_22px_rgba(16,24,40,0.08)];
+  }
+
+  .tab-btn-active {
+    @apply bg-indigo-600 text-white border-indigo-600;
+    @apply shadow-[0_14px_30px_rgba(99,102,241,0.22)];
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
+  }
+
+  .badge-ok {
+    @apply badge border-emerald-200 bg-emerald-50 text-emerald-700;
+  }
+
+  .badge-off {
+    @apply badge border-zinc-200 bg-zinc-50 text-zinc-700;
+  }
+
+  .table-wrap {
+    @apply overflow-x-auto rounded-2xl border border-zinc-200 bg-white;
+    @apply shadow-[0_1px_2px_rgba(16,24,40,0.04)];
+  }
+
+  .table {
+    @apply min-w-[820px] w-full text-sm;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .table thead {
+    @apply bg-zinc-50;
+  }
+
+  .table th {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600;
+    @apply border-b border-zinc-200;
+  }
+
+  .table td {
+    @apply px-4 py-3 text-zinc-900;
+  }
+
+  .table tbody {
+    @apply divide-y divide-zinc-200;
+  }
+
+  .table tbody tr:nth-child(even) {
+    @apply bg-zinc-50/40;
+  }
+
+  .table tbody tr:hover {
+    @apply bg-zinc-50;
+  }
+
+  .suggest {
+    @apply absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-zinc-200 bg-white;
+    @apply shadow-[0_18px_36px_rgba(16,24,40,0.12)];
+  }
+
+  .suggest-item {
+    @apply flex cursor-pointer items-center justify-between px-3 py-2 text-sm transition-colors;
+    @apply text-zinc-900 hover:bg-zinc-50;
+  }
+
+  .suggest-item-active {
+    @apply bg-indigo-50;
+  }
+
+  .suggest-hint {
+    @apply text-xs text-zinc-500;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.45s ease-out;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
