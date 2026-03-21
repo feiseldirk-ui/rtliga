@@ -439,7 +439,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
       const wk = t.ergebnisse[wkidx];
 
       const { error } = await supabase.rpc("save_verein_ergebnis", {
-        p_verein_id: Number(verein.id),
+        p_verein_id: verein.id,
         p_vorname: t.vorname,
         p_nachname: t.name,
         p_altersklasse: t.altersklasse || "",
