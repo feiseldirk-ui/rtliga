@@ -62,10 +62,23 @@ function sanitizeImage(element, defaults = {}) {
   };
 }
 
+export function normalizeRoundTitleTemplate(value) {
+  const raw = String(value || '').replaceAll('\r', '').trim();
+  if (!raw) return 'Ergebnisse Runde {runde}';
+  if (raw.includes('{runde}')) return raw;
+  if (/\s+\d+\s*$/.test(raw)) return raw.replace(/\s+\d+\s*$/, ' {runde}');
+  return `${raw} {runde}`;
+}
+
+export function buildRoundTitle(value, roundNumber = 1) {
+  const template = normalizeRoundTitleTemplate(value);
+  return template.replace('{runde}', String(roundNumber || 1));
+}
+
 function buildLegacyElements(settings, mode, titleText) {
   const computedTitle = mode === 'overall'
     ? titleText || settings.overallHeaderText || [settings.overallTitle, settings.subtitle].filter(Boolean).join('\n')
-    : titleText || settings.roundTitle || 'Rundenprotokoll';
+    : titleText || buildRoundTitle(settings.roundTitle, 1);
 
   return [
     sanitizeImage(
@@ -157,7 +170,7 @@ export function getEditorElements(settings, mode, titleText) {
             : { x: 120, y: 220, width: 120, height: 70 }
       );
     }
-    return sanitizeText(
+    const baseTextElement = sanitizeText(
       element,
       fallbackRole === 'leagueTitle'
         ? LEAGUE_TITLE_DEFAULTS[mode]
@@ -167,6 +180,10 @@ export function getEditorElements(settings, mode, titleText) {
             ? TITLE_DEFAULTS[mode]
             : { x: 120, y: 180, width: 220, height: 44, fontSize: 12, fontWeight: 'normal' }
     );
+    if (fallbackRole === 'title' && titleText) {
+      return { ...baseTextElement, text: titleText };
+    }
+    return baseTextElement;
   });
 
   return ensureBaseElements(sanitized.length ? sanitized : buildLegacyElements(settings, mode, titleText), settings, mode, titleText);
@@ -190,7 +207,10 @@ export function applyEditorElementsToSettings(settings, mode, elements) {
       next.overallHeaderFontSize = title.fontSize || next.overallHeaderFontSize;
       next.overallHeaderFontWeight = title.fontWeight || next.overallHeaderFontWeight;
     } else {
-      next.roundTitle = title.text.replaceAll('\n', ' ').trim();
+      next.roundTitle = normalizeRoundTitleTemplate(title.text.replaceAll('\n', ' ').trim());
+      next.overallHeaderFontFamily = title.fontFamily || next.overallHeaderFontFamily;
+      next.overallHeaderFontSize = title.fontSize || next.overallHeaderFontSize;
+      next.overallHeaderFontWeight = title.fontWeight || next.overallHeaderFontWeight;
     }
   }
 

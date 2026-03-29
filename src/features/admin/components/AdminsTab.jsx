@@ -186,10 +186,7 @@ export default function AdminsTab() {
   useEffect(() => {
     if (!verified) return undefined;
     setContentReloadKey((value) => value + 1);
-    const timer = window.setTimeout(() => {
-      setContentReloadKey((value) => value + 1);
-    }, 350);
-    return () => window.clearTimeout(timer);
+    return undefined;
   }, [activeTab, verified]);
 
   const handleAdminLogin = async (event) => {
@@ -400,8 +397,8 @@ export default function AdminsTab() {
     <div className="min-h-screen bg-zinc-50">
       <div className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mx-auto max-w-[1750px] px-4 py-3 sm:px-6 lg:px-8">
-          <div className="grid items-start gap-4 lg:grid-cols-[148px_1fr_148px]">
-            <div className="flex justify-start pt-1">
+          <div className="grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
+            <div className="flex justify-start lg:pt-1">
               <MediaPanel compact showIntro={false} filterType="audio" />
             </div>
 
@@ -450,7 +447,7 @@ export default function AdminsTab() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-1">
+            <div className="flex justify-start lg:justify-end lg:pt-1">
               <MediaPanel compact showIntro={false} filterType="video" />
             </div>
           </div>

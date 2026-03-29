@@ -22,87 +22,79 @@ function CompactMediaCard({ item, signedUrl, onDownload, downloadingId, unavaila
   return (
     <div
       ref={cardRef}
-      className={`group mt-4 flex h-[168px] w-[148px] flex-col overflow-hidden rounded-[26px] border bg-white/96 p-3 shadow-[0_1px_2px_rgba(16,24,40,0.06)] backdrop-blur transition-all duration-200 ${
+      className={`group flex min-h-[92px] w-full max-w-[220px] flex-col justify-between rounded-[24px] border bg-white/96 p-3 shadow-[0_1px_2px_rgba(16,24,40,0.06)] backdrop-blur transition-all duration-200 sm:min-h-[100px] ${
         active
-          ? "border-indigo-300 shadow-[0_12px_24px_rgba(99,102,241,0.12)]"
-          : "border-zinc-200/80 hover:z-20 hover:shadow-[0_12px_24px_rgba(16,24,40,0.12)]"
+          ? "border-indigo-300 shadow-[0_10px_22px_rgba(99,102,241,0.12)]"
+          : "border-zinc-200/80 hover:z-20 hover:shadow-[0_10px_22px_rgba(16,24,40,0.12)]"
       }`}
     >
-      <div className="mb-2 flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-indigo-600">
             {isAudio ? "Audio" : "Video"}
           </p>
-          <h4 className="mt-1 line-clamp-2 text-[12px] font-semibold leading-tight text-zinc-900">{item.title}</h4>
+          <h4 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-zinc-900">{item.title}</h4>
         </div>
-        <span className="shrink-0 rounded-full border border-zinc-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-zinc-500">
+        <span className="shrink-0 rounded-full border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-500">
           Privat
         </span>
       </div>
 
       {signedUrl ? (
-        isAudio ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-[20px] border border-zinc-200 bg-zinc-50/90 px-3 py-4">
+        <div className="mt-3 flex items-center gap-2.5">
+          {isAudio ? (
             <button
               type="button"
               onClick={() => onToggleAudio?.(item, signedUrl)}
-              className={`inline-flex h-12 w-12 items-center justify-center rounded-full border text-base font-semibold transition ${
+              className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-base font-semibold transition ${
                 audioPlaying
-                  ? "border-indigo-300 bg-indigo-600 text-white shadow-[0_12px_26px_rgba(99,102,241,0.22)]"
+                  ? "border-indigo-300 bg-indigo-600 text-white shadow-[0_10px_22px_rgba(99,102,241,0.22)]"
                   : "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-100"
               }`}
               aria-label={audioPlaying ? "Audio pausieren" : "Audio abspielen"}
             >
               {audioPlaying ? "❚❚" : "▶"}
             </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleOpen}
+              className="relative flex h-11 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 bg-black/95"
+            >
+              <video playsInline preload="metadata" muted className="pointer-events-none h-full w-full object-cover opacity-90">
+                <source src={signedUrl} type="video/mp4" />
+              </video>
+              <span className="absolute inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-zinc-900 shadow">▶</span>
+            </button>
+          )}
+
+          <div className="min-w-0 flex-1 space-y-2">
+            {!isAudio ? (
+              <button
+                type="button"
+                onClick={handleOpen}
+                className="w-full rounded-full border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                disabled={!signedUrl}
+              >
+                Öffnen
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => onDownload(item)}
-              className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-100"
+              className="w-full rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
               disabled={!signedUrl || isDownloading}
-              aria-label="MP3 herunterladen"
+              aria-label={isAudio ? "MP3 herunterladen" : "MP4 herunterladen"}
             >
-              {isDownloading ? "Lädt…" : "Download"}
+              {isDownloading ? "Lädt…" : isAudio ? "MP3 laden" : "Download"}
             </button>
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={handleOpen}
-            className="relative flex h-[64px] w-full items-center justify-center overflow-hidden rounded-[20px] border border-zinc-200 bg-black/95"
-          >
-            <video
-              playsInline
-              preload="metadata"
-              muted
-              className="pointer-events-none h-full w-full object-contain opacity-90"
-            >
-              <source src={signedUrl} type="video/mp4" />
-            </video>
-            <span className="absolute inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-zinc-900 shadow">▶</span>
-          </button>
-        )
+        </div>
       ) : (
-        <div className="flex flex-1 items-center justify-center rounded-[20px] border border-dashed border-zinc-300 bg-zinc-50 px-2 text-center text-[10px] text-zinc-500">
+        <div className="mt-3 flex min-h-[48px] items-center justify-center rounded-[18px] border border-dashed border-zinc-300 bg-zinc-50 px-2 text-center text-[10px] text-zinc-500">
           {unavailableReason || "Medium aktuell nicht verfügbar."}
         </div>
       )}
-
-      {!isAudio ? (
-        <div className="mt-auto flex items-center gap-2 pt-3">
-          <button
-            type="button"
-            onClick={handleOpen}
-            className="min-w-0 flex-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100"
-            disabled={!signedUrl}
-          >
-            Öffnen
-          </button>
-          <button type="button" onClick={() => onDownload(item)} className="btn-mini !px-2.5 !py-1.5 !text-[10px]" disabled={!signedUrl || isDownloading}>
-            {isDownloading ? "…" : "↓"}
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -414,7 +406,7 @@ export default function MediaPanel({
 
     return (
       <>
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex w-full flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-start">
           {visibleItems.map((item) => {
             const signedUrl = signedUrls[item.path] || "";
             return (

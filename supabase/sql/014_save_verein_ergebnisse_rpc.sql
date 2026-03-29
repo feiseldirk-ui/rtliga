@@ -1,7 +1,47 @@
 begin;
 
-create or replace function public.save_verein_ergebnis(
-  p_verein_id bigint,
+drop function if exists public.save_verein_ergebnis(
+  bigint,
+  text,
+  text,
+  text,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  text,
+  text,
+  integer
+);
+
+drop function if exists public.save_verein_ergebnis(
+  uuid,
+  text,
+  text,
+  text,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  integer,
+  text,
+  text,
+  integer
+);
+
+create function public.save_verein_ergebnis(
+  p_verein_id uuid,
   p_vorname text,
   p_nachname text,
   p_altersklasse text,
@@ -49,7 +89,7 @@ begin
       and t.vorname = p_vorname
       and t.name = p_nachname
       and coalesce(t.altersklasse, '') = coalesce(p_altersklasse, '')
-      and coalesce(t.saison, p_saison) = p_saison
+      and coalesce(t.saison, p_saison::text) = p_saison::text
   ) then
     raise exception 'Teilnehmer gehört nicht zum aktuellen Verein oder zur Saison.' using errcode = '23503';
   end if;
@@ -71,7 +111,8 @@ begin
     gesamt,
     status,
     ergebnis,
-    saison
+    saison,
+    verein_id
   )
   values (
     v_verein_name,
@@ -90,7 +131,8 @@ begin
     p_gesamt,
     coalesce(p_status, ''),
     coalesce(p_ergebnis, ''),
-    p_saison
+    p_saison,
+    p_verein_id
   )
   on conflict (saison, verein, vorname, nachname, altersklasse, wettkampf)
   do update set
@@ -104,7 +146,8 @@ begin
     sl = excluded.sl,
     gesamt = excluded.gesamt,
     status = excluded.status,
-    ergebnis = excluded.ergebnis
+    ergebnis = excluded.ergebnis,
+    verein_id = excluded.verein_id
   returning id into v_result_id;
 
   return v_result_id;
@@ -112,7 +155,7 @@ end;
 $$;
 
 grant execute on function public.save_verein_ergebnis(
-  bigint,
+  uuid,
   text,
   text,
   text,
@@ -130,5 +173,15 @@ grant execute on function public.save_verein_ergebnis(
   text,
   integer
 ) to authenticated;
+
+create unique index if not exists verein_ergebnisse_unique_idx
+on public.verein_ergebnisse (
+  saison,
+  verein,
+  vorname,
+  nachname,
+  altersklasse,
+  wettkampf
+);
 
 commit;

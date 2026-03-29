@@ -24,11 +24,11 @@ export default function DashboardShell({
   return (
     <div className="min-h-screen">
       <div className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4 py-1.5 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-[minmax(0,148px)_1fr_minmax(0,148px)] items-start gap-3 lg:grid-cols-[minmax(0,156px)_1fr_minmax(0,156px)]">
-            <div className="flex min-h-[64px] items-start justify-start pt-2">{leftSlot}</div>
+        <div className="mx-auto max-w-7xl px-3 py-2 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-[minmax(0,112px)_1fr_minmax(0,112px)] lg:grid-cols-[minmax(0,156px)_1fr_minmax(0,156px)]">
+            <div className="hidden min-h-[64px] items-start justify-start pt-2 md:flex">{leftSlot}</div>
 
-            <div className="min-w-0">
+            <div className="order-1 min-w-0 md:order-none">
               {!hideStickyIdentity ? (
                 <div className="mb-4 flex min-w-0 items-center justify-center gap-3 sm:gap-4">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border border-zinc-200 bg-white shadow-sm">
@@ -47,9 +47,16 @@ export default function DashboardShell({
               ) : null}
 
               {stickyContent ? <div>{stickyContent}</div> : null}
+
+              {(leftSlot || right) ? (
+                <div className="mt-3 flex items-start justify-between gap-3 md:hidden">
+                  <div className="min-w-0 flex-1">{leftSlot}</div>
+                  <div className="min-w-0 flex-1">{right}</div>
+                </div>
+              ) : null}
             </div>
 
-            <div className="flex min-h-[64px] items-start justify-end pt-2">{right}</div>
+            <div className="hidden min-h-[64px] items-start justify-end pt-2 md:flex">{right}</div>
           </div>
         </div>
       </div>

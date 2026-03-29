@@ -125,8 +125,8 @@ export default function VereinErgebnisseAnzeigen({ verein }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-zinc-200 bg-gradient-to-r from-white via-indigo-50/60 to-sky-50/60 p-5 shadow-[0_1px_2px_rgba(16,24,40,0.05)] sm:p-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+      <div className="rounded-3xl border border-zinc-200 bg-gradient-to-r from-white via-indigo-50/60 to-sky-50/60 p-4 shadow-[0_1px_2px_rgba(16,24,40,0.05)] sm:p-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">
               Vereinsauswertung
@@ -138,7 +138,7 @@ export default function VereinErgebnisseAnzeigen({ verein }) {
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                 Teilnehmer
@@ -245,14 +245,14 @@ export default function VereinErgebnisseAnzeigen({ verein }) {
                     </div>
 
                     <div className="mt-4">
-                      <div className="mb-2 flex items-center justify-between">
+                      <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
                           Wettkämpfe
                         </p>
                         <p className="text-xs text-zinc-500">Alle 9 Wettkämpfe im Überblick</p>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-9">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-9">
                         {eintrag.punkte.map((pkt, i) => (
                           <div
                             key={i}

@@ -5,7 +5,7 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { loadSeasonSettings } from "./seasonSettings";
 import PdfPreviewPage from "../shared/pdf/PdfPreviewPage";
-import { EDITOR_CANVAS_HEIGHT, EDITOR_CANVAS_WIDTH } from "../shared/pdf/editorLayout";
+import { EDITOR_CANVAS_HEIGHT, EDITOR_CANVAS_WIDTH, buildRoundTitle } from "../shared/pdf/editorLayout";
 
 async function waitForPreviewReady(node) {
   if (!node) return;
@@ -36,28 +36,79 @@ async function waitForPreviewReady(node) {
   );
 }
 
+function estimateClassBlockHeight(rows = [], mode) {
+  const rowCount = Array.isArray(rows) ? rows.length : 0;
+  const classHeaderHeight = 34;
+  const tableHeaderHeight = mode === "overall" ? 30 : 32;
+  const rowHeight = mode === "overall" ? 36 : 34;
+  const qualificationHeight = mode === "overall" ? 18 : 0;
+  const containerPadding = 28;
+  return classHeaderHeight + tableHeaderHeight + rowCount * rowHeight + qualificationHeight + containerPadding;
+}
+
 function chunkClasses(entries = [], mode) {
   const pages = [];
   let current = [];
-  let used = 0;
-  const max = mode === "overall" ? 24 : 22;
+  let usedHeight = 0;
+  const pageBudget = mode === "overall" ? 650 : 690;
+
   entries.forEach(([klasse, rows]) => {
-    const weight = 4 + rows.length;
-    if (current.length && used + weight > max) {
+    const blockHeight = estimateClassBlockHeight(rows, mode);
+    if (current.length && usedHeight + blockHeight > pageBudget) {
       pages.push(current);
       current = [];
-      used = 0;
+      usedHeight = 0;
     }
     current.push([klasse, rows]);
-    used += weight;
+    usedHeight += blockHeight;
   });
+
   if (current.length) pages.push(current);
   return pages;
 }
 
-async function exportPagesWithPreview({ mode, titleText, seasonText, classesEntries, fileName }) {
+function formatTimestampForFilename(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type)?.value || "00";
+  return `${get("year")}-${get("month")}-${get("day")}_${get("hour")}-${get("minute")}`;
+}
+
+function formatExportDate(date = new Date()) {
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function sanitizeFileSegment(value) {
+  return String(value || "Export")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function buildPdfFileName(baseName, suffix = "") {
+  const timestamp = formatTimestampForFilename();
+  const base = sanitizeFileSegment(baseName);
+  const extra = sanitizeFileSegment(suffix);
+  return `${base}${extra ? `_${extra}` : ""}_${timestamp}.pdf`;
+}
+
+async function exportPagesWithPreview({ mode, titleText, seasonText, classesEntries, fileName, showClubColumn = true }) {
   const settings = loadSeasonSettings();
   const pageGroups = chunkClasses(classesEntries, mode);
+  const generatedAt = formatExportDate();
   const host = document.createElement("div");
   host.style.position = "fixed";
   host.style.left = "-10000px";
@@ -85,6 +136,10 @@ async function exportPagesWithPreview({ mode, titleText, seasonText, classesEntr
             seasonText,
             classes: pageGroups[i],
             activeField: "",
+            pageIndex: i,
+            pageCount: pageGroups.length,
+            generatedAt,
+            showClubColumn,
           })
         );
       });
@@ -122,18 +177,19 @@ export async function exportOverallPdf({ groupedResults, season, fileName }) {
     titleText: overallHeaderText,
     seasonText: `${season}`,
     classesEntries: entries,
-    fileName: fileName || `${firstLine}_${season}.pdf`,
+    fileName: fileName || buildPdfFileName(firstLine, season),
   });
 }
 
-export async function exportRoundProtocolPdf({ groupedResults, season, roundNumber, fileName }) {
+export async function exportRoundProtocolPdf({ groupedResults, season, roundNumber, fileName, isAdmin = true }) {
   const settings = loadSeasonSettings();
   const entries = Object.entries(groupedResults || {}).filter(([, rows]) => rows?.length);
   await exportPagesWithPreview({
     mode: "round",
-    titleText: `${settings.roundTitle} ${roundNumber}`,
+    titleText: buildRoundTitle(settings.roundTitle, roundNumber),
     seasonText: `${season}`,
     classesEntries: entries,
-    fileName: fileName || `Ergebnisse_Runde${roundNumber}_${season}.pdf`,
+    fileName: fileName || buildPdfFileName(`Ergebnisse_Runde${roundNumber}`, season),
+    showClubColumn: Boolean(isAdmin),
   });
 }

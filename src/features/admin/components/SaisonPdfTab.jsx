@@ -5,6 +5,7 @@ import {
   createImageElement,
   createTextElement,
   getEditorElements,
+  buildRoundTitle,
 } from "../../../shared/pdf/editorLayout";
 import {
   fileToDataUrl,
@@ -166,6 +167,7 @@ export default function SaisonPdfTab() {
   const [showGrid, setShowGrid] = useState(true);
   const [savedSettings, setSavedSettings] = useState(loadSeasonSettings());
   const [draftSettings, setDraftSettings] = useState(loadSeasonSettings());
+  const [previewRoundNumber, setPreviewRoundNumber] = useState(1);
   const [selectedElementId, setSelectedElementId] = useState("");
   const [syncState, setSyncState] = useState("local");
   const [notice, setNotice] = useState({ type: "info", message: "" });
@@ -197,7 +199,7 @@ export default function SaisonPdfTab() {
 
   const titleText = previewMode === "overall"
     ? draftSettings.overallHeaderText || [draftSettings.overallTitle, draftSettings.subtitle].filter(Boolean).join("\n")
-    : `${draftSettings.roundTitle || "Ergebnisse Runde"} 1`;
+    : buildRoundTitle(draftSettings.roundTitle, previewRoundNumber);
 
   const currentElements = useMemo(
     () => getEditorElements(draftSettings, previewMode, titleText),
@@ -265,19 +267,27 @@ export default function SaisonPdfTab() {
     setSyncState("syncing");
 
     try {
+      window.dispatchEvent(new CustomEvent("rtliga-admin-refresh", { detail: { source: "pdf-editor", phase: "local-save" } }));
       setSaveStage("remote");
-      const result = await saveSeasonSettingsToSupabase(locallySaved);
+      const result = await Promise.race([
+        saveSeasonSettingsToSupabase(locallySaved),
+        new Promise((resolve) => {
+          window.setTimeout(() => resolve({ ok: false, reason: "timeout" }), 12000);
+        }),
+      ]);
       if (result.ok) {
         setSyncState("synced");
         setJustSaved(true);
         setNotice({ type: "success", message: `Layout für Saison ${result.season || locallySaved.activeSeason} gespeichert.` });
+        window.dispatchEvent(new CustomEvent("rtliga-admin-refresh", { detail: { source: "pdf-editor", phase: "remote-save" } }));
         saveFeedbackTimeoutRef.current = window.setTimeout(() => {
           setJustSaved(false);
           saveFeedbackTimeoutRef.current = null;
         }, 2500);
       } else {
         setSyncState("local");
-        setNotice({ type: "warning", message: "Layout lokal gespeichert, aber nicht vollständig mit Supabase synchronisiert." });
+        setNotice({ type: "warning", message: result.reason === "timeout" ? "Layout lokal gespeichert. Die Supabase-Synchronisierung hat zu lange gedauert und wurde beendet." : "Layout lokal gespeichert, aber nicht vollständig mit Supabase synchronisiert." });
+        window.dispatchEvent(new CustomEvent("rtliga-admin-refresh", { detail: { source: "pdf-editor", phase: "fallback-save" } }));
       }
     } finally {
       setIsSaving(false);
@@ -378,6 +388,20 @@ export default function SaisonPdfTab() {
               <p className="mt-1 text-sm text-zinc-600">Gestrichelte Rahmen sind nur im Editor sichtbar. Elemente lassen sich per Maus verschieben und an den Ecken skalieren.</p>
             </div>
             <div className="text-xs font-medium text-zinc-500">Modus: {previewMode === "overall" ? "Gesamtergebnisliste" : "Rundenprotokoll"}</div>
+            {previewMode === "round" ? (
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-500">
+                <span>Vorschau-Runde</span>
+                <select
+                  className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-800"
+                  value={previewRoundNumber}
+                  onChange={(event) => setPreviewRoundNumber(Number(event.target.value))}
+                >
+                  {Array.from({ length: 9 }, (_, i) => i + 1).map((wk) => (
+                    <option key={wk} value={wk}>Runde {wk}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </div>
 
           <PdfPreviewPage

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { ensureSupabaseSession } from "../../../lib/authReady";
 import supabase from "../../../lib/supabase/client";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
@@ -20,6 +21,7 @@ const normalizeAgeClass = (value) => String(value || "").trim();
 
 const VereineTab = ({ onRefreshStats }) => {
   const [vereine, setVereine] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [offenVereinId, setOffenVereinId] = useState(null);
   const [teilnehmerMap, setTeilnehmerMap] = useState({});
   const [teilnehmerCounts, setTeilnehmerCounts] = useState({});
@@ -27,12 +29,15 @@ const VereineTab = ({ onRefreshStats }) => {
   const [ageFilter, setAgeFilter] = useState("Alle");
 
   const fetchVereine = React.useCallback(async () => {
-    const activeSeason = getActiveSeason();
-    const { data, error } = await supabase.from("vereine").select("*").order("vereinsname", { ascending: true });
-    if (error) {
-      logError("Vereine konnten nicht geladen werden.");
-      return;
-    }
+    setLoading(true);
+    try {
+      await ensureSupabaseSession({ retries: 4, interval: 120 }).catch(() => null);
+      const activeSeason = getActiveSeason();
+      const { data, error } = await supabase.from("vereine").select("*").order("vereinsname", { ascending: true });
+      if (error) {
+        logError("Vereine konnten nicht geladen werden.");
+        return;
+      }
 
     const vereinsListe = data || [];
     setVereine(vereinsListe);
@@ -66,14 +71,25 @@ const VereineTab = ({ onRefreshStats }) => {
       setTeilnehmerCounts(counts);
     }
 
-    if (typeof onRefreshStats === "function") onRefreshStats();
+      if (typeof onRefreshStats === "function") onRefreshStats();
+    } finally {
+      setLoading(false);
+    }
   }, [onRefreshStats]);
 
   useEffect(() => {
     fetchVereine();
   }, [fetchVereine]);
 
-  useEffect(() => subscribeToTables({ tables: ["vereine", "verein_teilnehmer"], onChange: fetchVereine }), [fetchVereine]);
+  useEffect(() => {
+    const handleAdminRefresh = () => fetchVereine();
+    window.addEventListener("rtliga-admin-refresh", handleAdminRefresh);
+    const unsubscribe = subscribeToTables({ tables: ["vereine", "verein_teilnehmer"], onChange: fetchVereine });
+    return () => {
+      window.removeEventListener("rtliga-admin-refresh", handleAdminRefresh);
+      unsubscribe?.();
+    };
+  }, [fetchVereine]);
 
   const loadTeilnehmer = async (vereinId) => {
     const activeSeason = getActiveSeason();
@@ -134,6 +150,10 @@ const VereineTab = ({ onRefreshStats }) => {
       return String(a.vorname || "").localeCompare(String(b.vorname || ""), "de", { sensitivity: "base" });
     });
   }, [ageFilter, nameSortOrder, offeneTeilnehmer]);
+
+  if (loading && vereine.length === 0) {
+    return <div className="rounded-3xl border border-zinc-200 bg-white px-5 py-10 text-center text-sm text-zinc-500 shadow-sm">Vereine werden geladen…</div>;
+  }
 
   return (
     <div className="space-y-6">

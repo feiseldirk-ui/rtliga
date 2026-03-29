@@ -105,11 +105,14 @@ const ErgebnisseTab = () => {
       }
     };
 
+    const handleAdminRefresh = () => ladeUndVerarbeiteErgebnisse();
     window.addEventListener("pageshow", ladeUndVerarbeiteErgebnisse);
+    window.addEventListener("rtliga-admin-refresh", handleAdminRefresh);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       window.removeEventListener("pageshow", ladeUndVerarbeiteErgebnisse);
+      window.removeEventListener("rtliga-admin-refresh", handleAdminRefresh);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [ladeUndVerarbeiteErgebnisse]);

@@ -1,126 +1,209 @@
-# RTLiga – CHATGPT HANDOFF (Deploy- und Sicherheitsstand)
+# RTLiga – CHATGPT HANDOFF (aktueller Prüfstand)
 
-## Projektziel
-RTLiga ist eine React-/Vite-Webapp für:
-- Vereinslogin
-- Vereinsregistrierung
-- Teilnehmerverwaltung
-- Ergebniserfassung
-- Gesamtergebnisse
-- Adminverwaltung
-- private Medien aus Supabase Storage
+## Projekt
+RTLiga Verwaltung (React + Vite + Supabase + GitHub Pages)
 
 ## Aktueller Stand
-Dieser ZIP-Stand ist für Veröffentlichung vorbereitet.
+- GitHub Pages Deployment läuft grundsätzlich.
+- Frontend-Build funktioniert.
+- Vereins- und Adminbereich sind grundsätzlich lauffähig.
+- Speichern von Vereinsergebnissen wurde zuletzt intensiv debuggt.
 
-Wesentliche Änderungen in diesem Stand:
-1. **Admin-Testschlüssel entfernt**
-   - `VITE_ADMIN_TEST_KEY` wird nicht mehr verwendet.
-   - Adminzugang läuft nur noch über Supabase Auth + `public.admins`.
+## Wichtigster aktueller Punkt
+Die Datei `supabase/sql/014_save_verein_ergebnisse_rpc.sql` war im Stand auf GitHub/ZIP veraltet und muss als **UUID-Version** vorliegen.
 
-2. **Adminzugang fest auf einen manuellen Account ausgelegt**
-   - vorgesehene Admin-Mail: `df0776@gmx.de`
-   - keine Admin-Registrierung im Frontend
-   - kein Admin-Passwort-vergessen-Link im Frontend
-   - Passwortänderung für Admin nur über Supabase / Admin-Mail
+### Korrekte Erwartungen an `save_verein_ergebnis`
+- `p_verein_id uuid`
+- Vergleich gegen `public.vereine.id` als UUID
+- `verein_teilnehmer.saison` ist in dieser Datenbank `text`
+- deshalb muss der Saisonvergleich lauten:
+  - `coalesce(t.saison, p_saison::text) = p_saison::text`
 
-3. **Vereinslogin auf `user_id` umgestellt**
-   - Vereinsdaten werden nach erfolgreichem Login über `vereine.user_id = auth.users.id` geladen.
+## Wichtige Erkenntnisse aus dem letzten Debugging
+### 1. Frontend-RPC-Aufruf
+Datei:
+- `src/features/verein/components/VereinErgebnisseEintragen.jsx`
 
-4. **Vereinsregistrierung bereinigt**
-   - kein `bcrypt`
-   - kein `passwort_hash`
-   - es wird nur Supabase Auth verwendet
-   - nach `signUp` wird ein Vereinsdatensatz mit `id`, `user_id`, `vereinsname`, `benutzername`, `email` angelegt
+Wichtiger Fix:
+- `p_verein_id: verein.id`
+- **nicht** `Number(verein.id)`
 
-5. **Passwort-Reset für Vereine ergänzt**
-   - neue Route: `/passwort-vergessen`
-   - neue Route: `/passwort-aendern`
-   - Reset-Link nutzt `window.location.origin + BASE_URL + "passwort-aendern"`
+### 2. SQL Function Overloads
+Während des Debuggings existierten zeitweise zwei Varianten von `save_verein_ergebnis` parallel:
+- bigint-Version
+- uuid-Version
 
-6. **GitHub Pages vorbereitet**
-   - `vite.config.js` nutzt `base: "/rtliga/"`
-   - `BrowserRouter` nutzt `basename={import.meta.env.BASE_URL}`
-   - `404.html` + `index.html` enthalten SPA-Fallback für Direktaufrufe und Reset-Links
+Das führte zu Fehlern wie:
+- `Could not choose the best candidate function between ...`
 
-## Kritische Voraussetzung in Supabase
-Vor echtem Betrieb muss die SQL-Datei ausgeführt werden:
+Wenn das erneut auftritt:
+1. bigint-Version gezielt löschen
+2. uuid-Version gezielt löschen
+3. nur die richtige uuid-Version neu anlegen
 
-`supabase/sql/006_public_registration_and_lock_admin.sql`
+### 3. Saison-Typen
+In `public.verein_teilnehmer` ist:
+- `verein_id = uuid`
+- `saison = text`
 
-Diese Datei macht drei wichtige Dinge:
-1. erlaubt Vereins-Insert für den eigenen eingeloggten User
-2. verriegelt `public.admins`, damit niemand sich selbst als Admin anlegen kann
-3. setzt / aktualisiert den einzelnen Admin `df0776@gmx.de`
+Darum darf die Function dort nicht integer direkt gegen text vergleichen.
 
-## Erwartete Supabase-Struktur
-### `public.vereine`
-Soll enthalten:
-- `id uuid`
-- `user_id uuid`
-- `vereinsname text`
-- `benutzername text`
-- `email text`
+### 4. ON CONFLICT / Unique Index
+Für `public.verein_ergebnisse` wurde ein passender Unique Index benötigt, damit `ON CONFLICT` funktioniert.
+Benötigt wurde effektiv ein eindeutiger Schlüssel auf:
+- `(saison, verein, vorname, nachname, altersklasse, wettkampf)`
 
-### `public.admins`
-Soll enthalten:
-- `user_id uuid`
-- `email text`
-- `role text`
-- optional Legacy-Spalten, die aber nicht mehr aktiv genutzt werden
+### 5. Altdaten / Testdaten
+Es gibt bzw. gab inkonsistente Alt-Testdaten:
+- teils `verein_id = NULL` in `public.verein_ergebnisse`
+- teils nur stringbasierte Zuordnung über `verein`
+- teils neuere Datensätze mit korrekter UUID-Verknüpfung
 
-## Wichtige URLs in Supabase
-### Site URL
-`https://feiseldirk-ui.github.io/rtliga`
+Das hat Folgeeffekte auf:
+- „Meine Ergebnisse“
+- Teilnehmer-Sperrstatus (`Protokolliert` / `Änderbar`)
+- Anzeige bereits gespeicherter Werte
 
-### Redirect URLs
-- `http://localhost:5173/passwort-aendern`
-- `https://feiseldirk-ui.github.io/rtliga/passwort-aendern`
+## Aktuelle Einschätzung
+### Was technisch grundsätzlich funktioniert
+- neue/saubere Vereine mit sauberer Auth-Verknüpfung
+- Ergebnisse können gespeichert werden, wenn Teilnehmer korrekt im Verein existieren
+- für Vereine mit konsistenter Datenbasis funktionieren Ergebnislisten sichtbar besser
 
-## Wichtige Dateien
-- `src/App.jsx`
-- `src/main.jsx`
-- `src/features/auth/components/VereinLogin.jsx`
-- `src/features/auth/components/VereinRegistrierung.jsx`
-- `src/features/auth/pages/PasswortVergessen.jsx`
-- `src/features/auth/pages/PasswortZuruecksetzen.jsx`
-- `src/features/admin/components/AdminsTab.jsx`
-- `vite.config.js`
-- `404.html`
-- `index.html`
-- `supabase/sql/006_public_registration_and_lock_admin.sql`
+### Was noch problematisch sein kann
+- alte Testvereine / alte Ergebnisdatensätze
+- Anzeige „Meine Ergebnisse“ wenn noch nach `verein`-Text statt `verein_id` gearbeitet wird
+- Teilnehmerverwaltung kann bei Alt-Daten noch `Änderbar` zeigen, obwohl Ergebnisse existieren
 
-## Regeln für neue Chats
-- Immer komplette Dateien ausgeben.
-- Immer klar den Dateinamen dazuschreiben.
-- Adminzugang nie wieder clientseitig mit Testschlüssel absichern.
-- Kein `passwort_hash` im Frontend zurückbringen.
-- Für Deployments auf GitHub Pages auf `base: "/rtliga/"` achten.
-- Bei Problemen mit Reset-Links zuerst prüfen:
-  - ist die neue Version wirklich deployed?
-  - stimmen Site URL und Redirect URLs in Supabase?
-  - zeigt `404.html` noch auf den SPA-Fallback?
+## Empfohlene Datenstrategie
+Da das Projekt noch im Testmodus ist, ist die empfohlene saubere Lösung:
+1. alte inkonsistente Testvereine löschen
+2. alte inkonsistente `verein_ergebnisse` löschen
+3. Vereine neu anlegen
+4. Teilnehmer neu anlegen
+5. Ergebnisse neu erfassen
 
-## Mögliche Restbaustellen
-- Admin-Tabs enthalten teils noch breite `select`-Abfragen; funktional okay, später weiter härten.
-- Wenn RLS in Supabase nochmals geändert wird, zuerst Login/Registrierung/Admin testen.
-- Medienzugriff hängt weiterhin an den Storage-Policies in Supabase.
+Das ist sauberer als alte und neue Logik weiter zu mischen.
 
-## Empfohlener Test nach neuem Chat
-1. `npm install`
-2. `npm run build`
-3. Deploy ausführen
-4. online testen:
-   - `/`
-   - `/login`
-   - `/registrieren`
-   - `/passwort-vergessen`
-   - `/passwort-aendern`
-   - `/admin`
-5. Supabase-Reset-Mail erneut testen
+## Dateien, die im nächsten Chat zuerst geprüft werden sollten
+- `supabase/sql/014_save_verein_ergebnisse_rpc.sql`
+- `src/features/verein/components/VereinErgebnisseEintragen.jsx`
+- `src/features/verein/components/VereinErgebnisseAnzeigen.jsx`
+- `src/shared/ui/dashboard/TeilnehmerPanel.jsx`
+- `CHATGPT_HANDOFF.md`
 
+## Ziel für den nächsten Chat
+1. SQL-Datei `014_save_verein_ergebnisse_rpc.sql` final sauber halten
+2. prüfen, ob Ergebnisanzeige von stringbasiertem `verein` auf `verein_id` umgestellt werden soll
+3. prüfen, ob Teilnehmer-Sperrlogik ebenfalls auf `verein_id` gestützt werden soll
+4. danach komplette ZIP zurückgeben
 
-## Validierung
+## Arbeitsweise
+- immer komplette ZIP zurückgeben
+- ZIPs nur mit Datum + Uhrzeit benennen
+- keine `node_modules` in ZIP
+- möglichst nur minimale, nachvollziehbare Änderungen
+- keine riskanten Änderungen an Passwort-Reset/Login/Auth-Konfiguration ohne klaren Bedarf
+
+## Update 2026-03-28 – Rundenprotokoll / PDF
+
+### Durchgeführte Änderungen
+- `src/shared/pdf/PdfPreviewPage.jsx`
+  - **wichtiger Fix**: Rundenprotokoll-PDF zeigt jetzt korrekt
+    - `S1–S6`
+    - `LL`
+    - `SL`
+    - `Gesamt`
+  - vorher wurde im Round-Previewpfad fälschlich weiter mit einer 9x-WK-Logik gearbeitet.
+  - Tabellen im PDF wurden leicht verdichtet, damit Seiten luftiger und stabiler bleiben.
+  - Footer-Datum ist jetzt dynamisch.
+  - Seitenzahl (`Seite x / y`) wird jetzt im PDF ausgegeben.
+  - Vereins-PDF kann die Vereinsspalte jetzt ausblenden; Admin-PDF behält sie.
+
+- `src/lib/pdfExport.js`
+  - Seitenaufteilung für PDF nicht mehr nur grob per alter Gewichtung, sondern über realistischere Höhenabschätzung pro Klassenblock.
+  - Standard-Dateinamen für PDF-Exporte enthalten jetzt automatisch Datum/Uhrzeit.
+
+- `src/features/admin/components/RundenprotokollTab.jsx`
+  - erkennt Runden mit vorhandenen Ergebnissen.
+  - Schalter `Neueste Runde` ergänzt.
+  - leere Runden im Dropdown werden als leer markiert.
+
+- `src/features/verein/components/VereinRundenprotokollTab.jsx`
+  - wechselt automatisch auf die **neueste geschlossene Runde mit echten Vereinsergebnissen**.
+  - Schalter `Neueste Runde` ergänzt.
+  - geschlossene Runden ohne Vereinseintrag werden kenntlich gemacht.
+  - eigener Leerzustand, falls zwar geschlossene Wettkämpfe existieren, aber für den Verein noch kein Protokoll vorliegt.
+
+### Wichtig für den nächsten Chat
+- PDF-Strecke ist jetzt deutlich brauchbarer, aber weitere optische Feinabstimmung bleibt möglich:
+  - Spaltenbreiten
+  - Kopfbereich / Logo-Luft
+  - Klassenanzahl pro Seite
+  - evtl. andere Seitenlogik für sehr volle Klassen
+
+### Build-Status
 - `npm ci` erfolgreich
 - `npm run build` erfolgreich
-- `dist/404.html` und `dist/.nojekyll` werden für GitHub Pages erzeugt
+- Vite meldet weiterhin nur die bekannte Warnung zu Chunkgröße / gemischtem statischen+dynamischen Import von `src/lib/supabase/client.js`
+
+## Update 2026-03-28 – Mobile / Vereinsbereich
+
+### Durchgeführte Änderungen
+- `src/shared/ui/dashboard/DashboardShell.jsx`
+  - Sticky-Kopfbereich auf kleinen Displays entschlackt.
+  - linkes/rechtes Medienfeld wird mobil nicht mehr in ein starres 3-Spalten-Raster gepresst.
+  - auf Mobilgeräten werden die Seitenslots unterhalb des Hauptbereichs sauber gestapelt.
+
+- `src/features/verein/components/VereinStart.jsx`
+  - Bereichs-Tabs mobil deutlich nutzbarer gemacht.
+  - Tabs sind jetzt auf kleinen Displays horizontal scrollbar statt unruhig umzubrechen.
+  - kurze Labels auf Handy, volle Labels ab `sm`.
+  - Logout-Button mobil auf volle Breite.
+  - Sticky-Stats bleiben erhalten, sind aber horizontal toleranter.
+
+- `src/features/verein/components/VereinRundenprotokollTab.jsx`
+  - Steuerbereich mobil neu gestapelt.
+  - Auswahlfeld und Aktionsbuttons auf kleinen Displays volle Breite.
+  - **wichtig:** für Handy gibt es jetzt eine Kartenansicht pro Teilnehmer statt nur breiter Tabelle.
+  - Desktop-Tabelle bleibt ab `md` unverändert erhalten.
+
+- `src/features/verein/components/VereinErgebnisseAnzeigen.jsx`
+  - Kopfbereich kompakter.
+  - Statistikboxen sauber untereinander auf kleinen Screens.
+  - WK-Kacheln auf Mobilgeräten kompakter (2 Spalten statt zu dichter 3er/5er Logik).
+
+- `src/index.css`
+  - Buttons/Inputs leicht mobiler skaliert.
+  - Tabellen-Wrapper mit besserem Touch-Scrolling.
+  - globale Tabellen-Minimalbreite etwas entschärft.
+  - Scrollbar-Helferklasse ergänzt.
+
+### Wichtige Wirkung
+- Vereinsbereich ist auf Handys spürbar besser bedienbar, ohne die bestehende Fachlogik zu ändern.
+- Besonders die Rundenprotokolle sind mobil jetzt nicht mehr nur „Desktop mit horizontalem Scroll“, sondern haben eine echte kompakte Darstellung.
+
+### Nicht geändert
+- keine Auth-/Login-Logik
+- keine Ergebnis-Speicherlogik
+- keine Supabase-Struktur
+- keine PDF-Fachlogik in diesem Schritt
+
+### Build-Status
+- `npm ci` erfolgreich
+- `npm run build` erfolgreich
+- weiterhin nur bekannte Vite-Warnungen zu Chunkgröße / Importstruktur
+
+
+## Update 2026-03-28 06:40
+- Audio-Kachel im Admin-Header gezielt verkleinert, damit der Header nicht unnötig hoch wirkt.
+- Rundenprotokoll-Ladevorgang im Admin robuster gemacht (Timeout + Retry), damit beim Tabwechsel nicht dauerhaft "wird geladen" stehen bleibt.
+- PDF-Rundenprotokoll: Zellen auf bessere vertikale Zentrierung angepasst; Namens-/Vereinsspalte leicht verbreitert, Werte-Spalten minimal kompakter.
+
+## Update 2026-03-28 06:xx
+- Compact-Media im Admin-Header erneut verschlankt: Audio/Video jetzt als deutlich flachere Kompaktkarten, damit der Sticky-Header vor allem auf kleineren Displays weniger Höhe verbraucht.
+- PDF-Editor-Speichern gegen Hänger abgesichert: Supabase-Sync läuft jetzt mit Timeout/Fallback, der Button bleibt nicht dauerhaft auf „Supabase wird aktualisiert…“ stehen.
+- Nach dem Speichern löst der Editor jetzt zusätzlich `rtliga-admin-refresh` aus, damit Admin-Tabs ihre Daten robuster neu laden.
+- Admin-Rundenprotokoll, Gesamtergebnisse und Vereine reagieren jetzt auch auf `rtliga-admin-refresh`.
+- Vereine-Tab bekam zusätzlich robustere Session-/Ladelogik.
+- PDF-Rundentabellen weiter nachzentriert: Namen/Vereine im Rundenmodus mittiger ausgerichtet, Zeilenhöhe leicht angehoben.

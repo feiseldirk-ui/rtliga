@@ -178,6 +178,10 @@ export default function PdfPreviewPage({
   onSelectElement,
   onElementsChange,
   showGrid = false,
+  pageIndex = 0,
+  pageCount = 1,
+  generatedAt = "10.03.2026, 12:00",
+  showClubColumn = true,
 }) {
   const elements = useMemo(
     () => getEditorElements(settings, mode, titleText),
@@ -229,6 +233,9 @@ export default function PdfPreviewPage({
   const qualificationPlaces = Number(settings.qualificationPlaces || 7);
   const normalizedClasses = mode === "overall" ? classes.map(([name, rows]) => [name, normalizeOverallRows(rows)]) : classes;
   const highlight = (field) => (activeField === field ? "ring-2 ring-violet-400 bg-violet-50/60" : "");
+  const isOverallMode = mode === "overall";
+  const roundHeaders = ["S1", "S2", "S3", "S4", "S5", "S6", "LL", "SL", "Gesamt"];
+  const pageLabel = `Seite ${pageIndex + 1} / ${pageCount}`;
 
   return (
     <div className="rounded-[28px] border border-zinc-200 bg-zinc-50 p-4">
@@ -266,53 +273,63 @@ export default function PdfPreviewPage({
             />
           ))}
 
-          <div className="absolute inset-x-6 top-[244px] space-y-7">
+          <div className="absolute inset-x-6 top-[224px] space-y-5">
             {normalizedClasses.map(([klasse, rows]) => {
-              const tableRows = mode === "overall" ? normalizeOverallRows(rows) : rows;
+              const tableRows = isOverallMode ? normalizeOverallRows(rows) : rows;
+              const valueColumns = isOverallMode
+                ? Array.from({ length: 9 }, (_, index) => ({ key: `wk-${index + 1}`, label: `WK${index + 1}` }))
+                : roundHeaders.map((label) => ({ key: label.toLowerCase(), label }));
+              const nameColumnWidth = isOverallMode ? "w-[84px]" : showClubColumn ? "w-[102px]" : "w-[118px]";
+              const clubColumnWidth = isOverallMode ? "w-[126px]" : "w-[154px]";
+              const valueColumnWidth = isOverallMode ? "w-[42px]" : showClubColumn ? "w-[36px]" : "w-[43px]";
+              const leadingColumnCount = showClubColumn ? 3 : 2;
+              const totalColSpan = leadingColumnCount + valueColumns.length + (isOverallMode ? 1 : 0);
               return (
                 <div key={klasse} className="overflow-hidden rounded-2xl border border-zinc-300 bg-white shadow-sm">
                   <div className="border-b border-zinc-300 bg-zinc-100 px-4 py-2 text-sm font-bold uppercase tracking-[0.18em] text-zinc-700">
                     {classLabel(klasse)}
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full table-fixed border-collapse text-[11px] text-zinc-800" style={{ lineHeight: 1.15 }}>
+                    <table className="min-w-full table-fixed border-collapse text-[10px] text-zinc-800" style={{ lineHeight: 1.1 }}>
                       <thead>
-                        <tr className="bg-zinc-50 text-left text-[10px] uppercase tracking-[0.12em] text-zinc-600">
-                          <th className="w-[36px] border border-zinc-300 px-0 py-0 align-middle"><div className="flex min-h-[30px] items-center px-2 py-2">Pl.</div></th>
-                          <th className="w-[82px] border border-zinc-300 px-0 py-0 align-middle"><div className="flex min-h-[30px] items-center px-2 py-2">Name</div></th>
-                          <th className="w-[132px] border border-zinc-300 px-0 py-0 align-middle"><div className="flex min-h-[30px] items-center px-2 py-2">Verein</div></th>
-                          {Array.from({ length: 9 }, (_, index) => (
-                            <th key={index} className="w-[46px] border border-zinc-300 px-0 py-0 text-center align-middle"><div className="flex min-h-[30px] items-center justify-center px-2 py-2">WK{index + 1}</div></th>
+                        <tr className="bg-zinc-50 text-left text-[9px] uppercase tracking-[0.12em] text-zinc-600">
+                          <th className="w-[34px] border border-zinc-300 px-0 py-0 align-middle"><div className="flex min-h-[28px] items-center px-2 py-1.5">Pl.</div></th>
+                          <th className={`border border-zinc-300 px-0 py-0 align-middle ${nameColumnWidth}`}><div className={`flex min-h-[28px] items-center px-2 py-1.5 ${isOverallMode ? "" : "justify-center text-center"}`}>Name</div></th>
+                          {showClubColumn ? <th className={`border border-zinc-300 px-0 py-0 align-middle ${clubColumnWidth}`}><div className={`flex min-h-[28px] items-center px-2 py-1.5 ${isOverallMode ? "" : "justify-center text-center"}`}>Verein</div></th> : null}
+                          {valueColumns.map((column) => (
+                            <th key={column.key} className={`border border-zinc-300 px-0 py-0 text-center align-middle ${valueColumnWidth}`}><div className="flex min-h-[28px] items-center justify-center px-1 py-1.5">{column.label}</div></th>
                           ))}
-                          {mode === "overall" ? <th className="w-[64px] border border-zinc-300 px-0 py-0 text-center align-middle"><div className="flex min-h-[30px] items-center justify-center px-2 py-2">Gesamt</div></th> : null}
+                          {isOverallMode ? <th className="w-[58px] border border-zinc-300 px-0 py-0 text-center align-middle"><div className="flex min-h-[28px] items-center justify-center px-2 py-1.5">Gesamt</div></th> : null}
                         </tr>
                       </thead>
                       <tbody>
-                        {tableRows.map((row, idx) => (
-                          <React.Fragment key={`${klasse}-${displayName(row)}-${idx}`}>
-                            <tr className={idx % 2 === 0 ? "bg-white" : "bg-zinc-50/70"}>
-                              <td className="border border-zinc-300 px-0 py-0 font-semibold align-middle"><div className="flex min-h-[38px] items-center px-2 py-2">{row.platz || idx + 1}</div></td>
-                              <td className="border border-zinc-300 px-0 py-0 align-middle"><div className="flex min-h-[38px] items-center px-2 py-2">{displayName(row)}</div></td>
-                              <td className="border border-zinc-300 px-0 py-0 align-middle"><div className="flex min-h-[38px] items-center px-2 py-2">{row.verein || "–"}</div></td>
-                              {(mode === "overall"
-                                ? row.wkValues || []
-                                : Array.from({ length: 9 }, (_, pointIndex) => ({ text: row[`wk${pointIndex + 1}`] || row.wkValues?.[pointIndex]?.text || "", strikeout: false }))
-                              ).map((value, valueIndex) => (
-                                <td key={valueIndex} className={`border border-zinc-300 px-0 py-0 text-center align-middle ${value?.strikeout ? "text-zinc-400 line-through" : ""}`}>
-                                  <div className="flex min-h-[38px] items-center justify-center px-2 py-2">{value?.text || "–"}</div>
-                                </td>
-                              ))}
-                              {mode === "overall" ? <td className="border border-zinc-300 px-0 py-0 text-center font-bold align-middle"><div className="flex min-h-[38px] items-center justify-center px-2 py-2">{row.gesamt}</div></td> : null}
-                            </tr>
-                            {mode === "overall" && idx + 1 === qualificationPlaces ? (
-                              <tr>
-                                <td colSpan={14} className="border-t-2 border-red-500 px-2 py-1 text-[10px] italic text-red-700">
-                                  {settings.qualificationText}
-                                </td>
+                        {tableRows.map((row, idx) => {
+                          const values = isOverallMode
+                            ? row.wkValues || []
+                            : [row.s1, row.s2, row.s3, row.s4, row.s5, row.s6, row.ll, row.sl, row.gesamt].map((value) => ({ text: value, strikeout: false }));
+                          return (
+                            <React.Fragment key={`${klasse}-${displayName(row)}-${idx}`}>
+                              <tr className={idx % 2 === 0 ? "bg-white" : "bg-zinc-50/70"}>
+                                <td className="border border-zinc-300 px-0 py-0 font-semibold align-middle"><div className="flex min-h-[42px] items-center justify-center px-2 py-1.5 text-center">{row.platz || idx + 1}</div></td>
+                                <td className="border border-zinc-300 px-0 py-0 align-middle"><div className={`flex min-h-[42px] items-center px-2 py-1.5 leading-tight ${isOverallMode ? "" : "justify-center text-center"}`}>{displayName(row)}</div></td>
+                                {showClubColumn ? <td className="border border-zinc-300 px-0 py-0 align-middle"><div className={`flex min-h-[42px] items-center break-words px-2 py-1.5 leading-tight ${isOverallMode ? "" : "justify-center text-center"}`}>{row.verein || "–"}</div></td> : null}
+                                {values.map((value, valueIndex) => (
+                                  <td key={valueIndex} className={`border border-zinc-300 px-0 py-0 text-center align-middle ${value?.strikeout ? "text-zinc-400 line-through" : ""}`}>
+                                    <div className="flex min-h-[42px] items-center justify-center px-1 py-1.5 text-center font-medium">{value?.text || value?.text === 0 ? value.text : "–"}</div>
+                                  </td>
+                                ))}
+                                {isOverallMode ? <td className="border border-zinc-300 px-0 py-0 text-center font-bold align-middle"><div className="flex min-h-[42px] items-center justify-center px-2 py-1.5 text-center">{row.gesamt}</div></td> : null}
                               </tr>
-                            ) : null}
-                          </React.Fragment>
-                        ))}
+                              {isOverallMode && idx + 1 === qualificationPlaces ? (
+                                <tr>
+                                  <td colSpan={totalColSpan} className="border-t-2 border-red-500 px-2 py-1 text-[9px] italic text-red-700">
+                                    {settings.qualificationText}
+                                  </td>
+                                </tr>
+                              ) : null}
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -321,8 +338,13 @@ export default function PdfPreviewPage({
             })}
           </div>
 
-          <div className={`absolute inset-x-6 bottom-6 rounded border-t border-zinc-300 pt-3 text-sm text-zinc-600 ${highlight("footerText")}`}>
-            {(settings.footerText || "Erstellt am {date}").replace("{date}", "10.03.2026")}
+          <div className="absolute inset-x-6 bottom-[42px] flex items-center justify-between border-t border-zinc-300 pt-2 text-[10px] text-zinc-500">
+            <div>{generatedAt}</div>
+            <div className="font-semibold text-zinc-600">{pageLabel}</div>
+          </div>
+
+          <div className={`absolute inset-x-6 bottom-5 rounded pt-1 text-sm text-zinc-600 ${highlight("footerText")}`}>
+            {(settings.footerText || "Erstellt am {date}").replace("{date}", generatedAt)}
           </div>
         </div>
       </div>

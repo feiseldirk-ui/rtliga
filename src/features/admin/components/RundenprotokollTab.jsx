@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { ensureSupabaseSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
@@ -6,7 +6,19 @@ import { subscribeToTables } from "../../../lib/realtime";
 import { loadSeasonSettings } from "../../../lib/seasonSettings";
 import { exportRoundProtocolPdf } from "../../../lib/pdfExport";
 import { groupRoundProtocolDetailed } from "../../../lib/resultsProcessing";
+import { buildRoundTitle } from "../../../shared/pdf/editorLayout";
 import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
+
+
+
+async function withTimeout(promise, timeoutMs = 12000) {
+  return await Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+    }),
+  ]);
+}
 
 function statusInfo(windowRow) {
   if (!windowRow?.start || !windowRow?.ende) {
@@ -30,7 +42,8 @@ export default function RundenprotokollTab() {
   const [windows, setWindows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const settings = loadSeasonSettings();
+  const [settings, setSettings] = useState(loadSeasonSettings());
+  const loadAttemptRef = useRef(0);
 
   const loadData = useCallback(async ({ keepLoading = false } = {}) => {
     if (!keepLoading) {
@@ -38,21 +51,42 @@ export default function RundenprotokollTab() {
     }
     setError("");
 
-    try {
-      await ensureSupabaseSession({ retries: 8, interval: 150 }).catch(() => null);
+    const runLoad = async () => {
       const activeSeason = getActiveSeason();
-      const [{ data: entryData, error: entryError }, { data: windowData, error: windowError }] = await Promise.all([
-        seasonOrNullFilter(supabase.from("verein_ergebnisse").select("*"), activeSeason),
-        seasonOrNullFilter(supabase.from("zeitfenster").select("wettkampf, start, ende").order("wettkampf", { ascending: true }), activeSeason),
-      ]);
+      return await withTimeout(
+        Promise.all([
+          seasonOrNullFilter(supabase.from("verein_ergebnisse").select("*"), activeSeason),
+          seasonOrNullFilter(supabase.from("zeitfenster").select("wettkampf, start, ende").order("wettkampf", { ascending: true }), activeSeason),
+        ]),
+        12000,
+      );
+    };
+
+    try {
+      await ensureSupabaseSession({ retries: 4, interval: 120 }).catch(() => null);
+      let result;
+      try {
+        result = await runLoad();
+      } catch (firstError) {
+        await new Promise((resolve) => window.setTimeout(resolve, 350));
+        result = await runLoad();
+      }
+      const [{ data: entryData, error: entryError }, { data: windowData, error: windowError }] = result;
 
       if (entryError) throw entryError;
       if (windowError) throw windowError;
 
       setEntries(entryData || []);
       setWindows(windowData || []);
+      loadAttemptRef.current = 0;
     } catch (err) {
       logError("Rundenergebnisse konnten nicht geladen werden.", err);
+      if (loadAttemptRef.current < 1) {
+        loadAttemptRef.current += 1;
+        window.setTimeout(() => {
+          loadData({ keepLoading: true });
+        }, 800);
+      }
       setError("Rundenergebnisse konnten nicht geladen werden.");
     } finally {
       setLoading(false);
@@ -60,6 +94,10 @@ export default function RundenprotokollTab() {
   }, []);
 
   useEffect(() => {
+    const handleSettingsUpdate = (event) => {
+      setSettings(event?.detail || loadSeasonSettings());
+    };
+    window.addEventListener("rtliga-settings-updated", handleSettingsUpdate);
     let retryTimer;
 
     loadData();
@@ -73,6 +111,9 @@ export default function RundenprotokollTab() {
     const handlePageShow = () => {
       loadData({ keepLoading: true });
     };
+    const handleAdminRefresh = () => {
+      loadData({ keepLoading: true });
+    };
 
     retryTimer = window.setTimeout(() => {
       loadData({ keepLoading: true });
@@ -80,6 +121,7 @@ export default function RundenprotokollTab() {
 
     window.addEventListener("pageshow", handlePageShow);
     window.addEventListener("focus", handlePageShow);
+    window.addEventListener("rtliga-admin-refresh", handleAdminRefresh);
     document.addEventListener("visibilitychange", handleVisibility);
     const unsubscribe = subscribeToTables({ tables: ["verein_ergebnisse", "zeitfenster"], onChange: () => loadData({ keepLoading: true }) });
 
@@ -87,17 +129,27 @@ export default function RundenprotokollTab() {
       window.clearTimeout(retryTimer);
       window.removeEventListener("pageshow", handlePageShow);
       window.removeEventListener("focus", handlePageShow);
+      window.removeEventListener("rtliga-admin-refresh", handleAdminRefresh);
       document.removeEventListener("visibilitychange", handleVisibility);
       unsubscribe?.();
+      window.removeEventListener("rtliga-settings-updated", handleSettingsUpdate);
     };
   }, [loadData]);
 
+  const roundsWithEntries = useMemo(() => Array.from(new Set((entries || []).map((entry) => Number(entry.wettkampf)).filter(Number.isFinite))).sort((a, b) => a - b), [entries]);
   const grouped = useMemo(() => groupRoundProtocolDetailed(entries, roundNumber, { includeClub: true }), [entries, roundNumber]);
   const groupedEntries = useMemo(() => Object.entries(grouped), [grouped]);
   const classCount = groupedEntries.length;
   const athleteCount = groupedEntries.reduce((sum, [, rows]) => sum + rows.length, 0);
   const currentWindow = windows.find((row) => Number(row.wettkampf) === Number(roundNumber));
   const currentStatus = statusInfo(currentWindow);
+
+  useEffect(() => {
+    if (!roundsWithEntries.length) return;
+    if (!roundsWithEntries.includes(Number(roundNumber))) {
+      setRoundNumber(roundsWithEntries[roundsWithEntries.length - 1]);
+    }
+  }, [roundNumber, roundsWithEntries]);
 
   const handleDownload = () => {
     exportRoundProtocolPdf({
@@ -123,7 +175,7 @@ export default function RundenprotokollTab() {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-600">Rundenprotokoll</p>
-            <h2 className="mt-2 text-2xl font-semibold text-zinc-900">Rundenergebnisse nach Vorlage</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-zinc-900">{buildRoundTitle(settings.roundTitle, roundNumber)}</h2>
             <p className="mt-2 max-w-3xl text-sm text-zinc-600 sm:text-base">
               Die Anzeige bleibt kompakt wie zuvor. Der PDF-Download nutzt weiterhin das Layout aus dem PDF-Editor.
             </p>
@@ -134,9 +186,10 @@ export default function RundenprotokollTab() {
               <label className="text-sm font-semibold text-zinc-700">Wettkampf</label>
               <select value={roundNumber} onChange={(e) => setRoundNumber(Number(e.target.value))} className="input w-36">
                 {Array.from({ length: 9 }, (_, i) => i + 1).map((wk) => (
-                  <option key={wk} value={wk}>WK {wk}</option>
+                  <option key={wk} value={wk} disabled={!roundsWithEntries.includes(wk)}>WK {wk}{roundsWithEntries.includes(wk) ? "" : " · leer"}</option>
                 ))}
               </select>
+              <button type="button" onClick={() => setRoundNumber(roundsWithEntries[roundsWithEntries.length - 1] || 1)} className="btn btn-secondary">Neueste Runde</button>
               <button type="button" onClick={handleDownload} className="btn btn-secondary">PDF herunterladen</button>
             </div>
             <div className={`rounded-full border px-3 py-1 text-xs font-semibold ${currentStatus.className}`}>{currentStatus.label}</div>
@@ -152,7 +205,7 @@ export default function RundenprotokollTab() {
           <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Teilnehmer</p>
             <p className="mt-2 text-xl font-semibold text-zinc-900">{athleteCount}</p>
-            <p className="mt-1 text-sm text-zinc-500">Mit Ergebnis in WK {roundNumber}</p>
+            <p className="mt-1 text-sm text-zinc-500">Mit Ergebnis in Runde {roundNumber}</p>
           </div>
           <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Altersklassen</p>
