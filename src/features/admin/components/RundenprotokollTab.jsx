@@ -44,8 +44,11 @@ export default function RundenprotokollTab() {
   const [error, setError] = useState("");
   const [settings, setSettings] = useState(loadSeasonSettings());
   const loadAttemptRef = useRef(0);
+  const requestIdRef = useRef(0);
 
   const loadData = useCallback(async ({ keepLoading = false } = {}) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     if (!keepLoading) {
       setLoading(true);
     }
@@ -76,10 +79,12 @@ export default function RundenprotokollTab() {
       if (entryError) throw entryError;
       if (windowError) throw windowError;
 
+      if (requestId !== requestIdRef.current) return;
       setEntries(entryData || []);
       setWindows(windowData || []);
       loadAttemptRef.current = 0;
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       logError("Rundenergebnisse konnten nicht geladen werden.", err);
       if (loadAttemptRef.current < 1) {
         loadAttemptRef.current += 1;
@@ -89,7 +94,9 @@ export default function RundenprotokollTab() {
       }
       setError("Rundenergebnisse konnten nicht geladen werden.");
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -114,6 +121,11 @@ export default function RundenprotokollTab() {
     const handleAdminRefresh = () => {
       loadData({ keepLoading: true });
     };
+    const handleTabActivated = (event) => {
+      if (event?.detail?.tab === "protokoll") {
+        loadData();
+      }
+    };
 
     retryTimer = window.setTimeout(() => {
       loadData({ keepLoading: true });
@@ -122,6 +134,7 @@ export default function RundenprotokollTab() {
     window.addEventListener("pageshow", handlePageShow);
     window.addEventListener("focus", handlePageShow);
     window.addEventListener("rtliga-admin-refresh", handleAdminRefresh);
+    window.addEventListener("rtliga-admin-tab-activated", handleTabActivated);
     document.addEventListener("visibilitychange", handleVisibility);
     const unsubscribe = subscribeToTables({ tables: ["verein_ergebnisse", "zeitfenster"], onChange: () => loadData({ keepLoading: true }) });
 
@@ -130,6 +143,7 @@ export default function RundenprotokollTab() {
       window.removeEventListener("pageshow", handlePageShow);
       window.removeEventListener("focus", handlePageShow);
       window.removeEventListener("rtliga-admin-refresh", handleAdminRefresh);
+      window.removeEventListener("rtliga-admin-tab-activated", handleTabActivated);
       document.removeEventListener("visibilitychange", handleVisibility);
       unsubscribe?.();
       window.removeEventListener("rtliga-settings-updated", handleSettingsUpdate);

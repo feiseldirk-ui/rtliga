@@ -6,6 +6,7 @@ import {
   createTextElement,
   getEditorElements,
   buildRoundTitle,
+  EDITOR_CANVAS_WIDTH,
 } from "../../../shared/pdf/editorLayout";
 import {
   fileToDataUrl,
@@ -85,7 +86,7 @@ function GeneralTextarea({ label, value, onChange, rows = 3 }) {
   );
 }
 
-function SelectedElementPanel({ element, onChange, onDelete, onUpload, uploading }) {
+function SelectedElementPanel({ element, onChange, onDelete, onUpload, onAlignField, uploading }) {
   if (!element) {
     return (
       <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-sm text-zinc-500">
@@ -133,6 +134,44 @@ function SelectedElementPanel({ element, onChange, onDelete, onUpload, uploading
               </select>
             </label>
           </div>
+          <div className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Text ausrichten</span>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: "left", label: "Links" },
+                { value: "center", label: "Zentriert" },
+                { value: "right", label: "Rechts" },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${element.textAlign === option.value ? "border-violet-500 bg-violet-600 text-white shadow-sm" : "border-zinc-200 bg-white text-zinc-700 hover:border-violet-300 hover:bg-violet-50"}`}
+                  onClick={() => onChange({ textAlign: option.value })}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Textfeld ausrichten</span>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: "left", label: "Links" },
+                { value: "center", label: "Zentriert" },
+                { value: "right", label: "Rechts" },
+              ].map((option) => (
+                <button
+                  key={`field-${option.value}`}
+                  type="button"
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 transition hover:border-violet-300 hover:bg-violet-50"
+                  onClick={() => onAlignField(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -155,6 +194,25 @@ function SelectedElementPanel({ element, onChange, onDelete, onUpload, uploading
             <GeneralInput label="Y" type="number" value={element.y} onChange={(event) => onChange({ y: Number(event.target.value || 0) })} />
             <GeneralInput label="Breite" type="number" value={element.width} onChange={(event) => onChange({ width: Number(event.target.value || 0) })} />
             <GeneralInput label="Höhe" type="number" value={element.height} onChange={(event) => onChange({ height: Number(event.target.value || 0) })} />
+          </div>
+          <div className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Logofeld ausrichten</span>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: "left", label: "Links" },
+                { value: "center", label: "Zentriert" },
+                { value: "right", label: "Rechts" },
+              ].map((option) => (
+                <button
+                  key={`image-field-${option.value}`}
+                  type="button"
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 transition hover:border-violet-300 hover:bg-violet-50"
+                  onClick={() => onAlignField(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
         </>
       )}
@@ -231,6 +289,17 @@ export default function SaisonPdfTab() {
       element.id === selectedElement.id ? { ...element, ...partial } : element
     );
     commitElements(nextElements);
+  };
+
+  const alignSelectedElement = (alignment) => {
+    if (!selectedElement) return;
+    const maxX = Math.max(0, EDITOR_CANVAS_WIDTH - selectedElement.width);
+    const nextX = alignment === "right"
+      ? maxX
+      : alignment === "center"
+        ? Math.round(maxX / 2)
+        : 0;
+    updateSelectedElement({ x: nextX });
   };
 
   const addTextElement = () => {
@@ -428,6 +497,7 @@ export default function SaisonPdfTab() {
             onChange={updateSelectedElement}
             onDelete={removeSelectedElement}
             onUpload={handleSelectedImageUpload}
+            onAlignField={alignSelectedElement}
             uploading={uploadingLogoSide === selectedElementId}
           />
           <StatusBanner syncState={syncState} notice={notice} dirty={dirty} isSaving={isSaving} saveStage={saveStage} />

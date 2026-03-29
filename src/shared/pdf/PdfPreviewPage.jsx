@@ -94,6 +94,10 @@ function EditorElement({
     height: element.height,
   };
 
+  const textAlign = element.textAlign || "left";
+  const justifyClass = textAlign === "right" ? "justify-end" : textAlign === "center" ? "justify-center" : "justify-start";
+  const textAlignClass = textAlign === "right" ? "text-right" : textAlign === "center" ? "text-center" : "text-left";
+
   const handles = ["nw", "ne", "sw", "se"];
 
   return (
@@ -126,12 +130,13 @@ function EditorElement({
         </div>
       ) : (
         <div
-          className={`flex h-full w-full items-center justify-center whitespace-pre-wrap rounded-xl border px-3 py-2 text-center text-zinc-900 ${editorMode ? "bg-white/50 shadow-none" : "bg-transparent shadow-none"} ${baseBorder}`}
+          className={`flex h-full w-full items-center whitespace-pre-wrap rounded-xl border px-3 py-2 text-zinc-900 ${justifyClass} ${textAlignClass} ${editorMode ? "bg-white/50 shadow-none" : "bg-transparent shadow-none"} ${baseBorder}`}
           style={{
             fontSize: `${element.fontSize}px`,
             fontFamily: element.fontFamily || "Arial",
             fontWeight: element.fontWeight || "normal",
             lineHeight: 1.1,
+            textAlign,
           }}
         >
           {element.text || "Text"}

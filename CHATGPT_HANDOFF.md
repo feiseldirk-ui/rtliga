@@ -207,3 +207,11 @@ Das ist sauberer als alte und neue Logik weiter zu mischen.
 - Admin-Rundenprotokoll, Gesamtergebnisse und Vereine reagieren jetzt auch auf `rtliga-admin-refresh`.
 - Vereine-Tab bekam zusätzlich robustere Session-/Ladelogik.
 - PDF-Rundentabellen weiter nachzentriert: Namen/Vereine im Rundenmodus mittiger ausgerichtet, Zeilenhöhe leicht angehoben.
+
+
+## Update 2026-03-29 09:50
+- Vereins-Header an Admin-Header angenähert: gleiche Sticky-Struktur, gleiche Medien-Slots links/rechts, Tabs kompakter und zentraler.
+- Compact Media Cards flacher und breiter gemacht, damit der Header weniger Höhe braucht.
+- Rundenprotokoll lädt jetzt zusätzlich bei expliziter Tab-Aktivierung (`rtliga-tab-activated`) in Admin- und Vereinsbereich neu.
+- PDF-Editor: Textfelder haben jetzt eine Ausrichtungswahl (Links / Mitte / Rechts). Vorschau rendert die Ausrichtung direkt.
+- Konnte den Build im Container diesmal nicht verifizieren, weil `npm`/`vite` lokal im Container keine nutzbare CLI bereitgestellt haben. Auf dem Nutzer-Rechner lief `npm run build` zuvor jedoch erfolgreich.

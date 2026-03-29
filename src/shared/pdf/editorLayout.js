@@ -3,18 +3,18 @@ export const EDITOR_CANVAS_HEIGHT = 980;
 export const EDITOR_GRID_SIZE = 8;
 
 const LEAGUE_TITLE_DEFAULTS = {
-  overall: { x: 176, y: 34, width: 320, height: 24, fontSize: 13, fontWeight: 'bold' },
-  round: { x: 176, y: 34, width: 320, height: 24, fontSize: 13, fontWeight: 'bold' },
+  overall: { x: 176, y: 34, width: 320, height: 24, fontSize: 13, fontWeight: 'bold', textAlign: 'center' },
+  round: { x: 176, y: 34, width: 320, height: 24, fontSize: 13, fontWeight: 'bold', textAlign: 'center' },
 };
 
 const SEASON_DEFAULTS = {
-  overall: { x: 516, y: 34, width: 70, height: 24, fontSize: 12, fontWeight: 'normal' },
-  round: { x: 516, y: 34, width: 70, height: 24, fontSize: 12, fontWeight: 'normal' },
+  overall: { x: 516, y: 34, width: 70, height: 24, fontSize: 12, fontWeight: 'normal', textAlign: 'center' },
+  round: { x: 516, y: 34, width: 70, height: 24, fontSize: 12, fontWeight: 'normal', textAlign: 'center' },
 };
 
 const TITLE_DEFAULTS = {
-  overall: { x: 160, y: 90, width: 400, height: 60, fontSize: 24, fontWeight: 'bold' },
-  round: { x: 160, y: 92, width: 400, height: 48, fontSize: 24, fontWeight: 'bold' },
+  overall: { x: 160, y: 90, width: 400, height: 60, fontSize: 24, fontWeight: 'bold', textAlign: 'center' },
+  round: { x: 160, y: 92, width: 400, height: 48, fontSize: 24, fontWeight: 'bold', textAlign: 'center' },
 };
 
 const LOGO_LEFT_DEFAULTS = {
@@ -45,6 +45,7 @@ function sanitizeText(element, defaults = {}) {
     fontSize: Math.round(Math.max(8, numeric(element.fontSize, defaults.fontSize ?? 12))),
     fontFamily: element.fontFamily || defaults.fontFamily || 'Arial',
     fontWeight: element.fontWeight || defaults.fontWeight || 'normal',
+    textAlign: ['left', 'center', 'right'].includes(element.textAlign) ? element.textAlign : (defaults.textAlign || 'left'),
   };
 }
 
@@ -100,6 +101,7 @@ function buildLegacyElements(settings, mode, titleText) {
         role: 'leagueTitle',
         text: settings.pdfLeagueTitle || '',
         ...LEAGUE_TITLE_DEFAULTS[mode],
+        textAlign: settings.pdfLeagueTitleAlign || LEAGUE_TITLE_DEFAULTS[mode].textAlign,
       },
       LEAGUE_TITLE_DEFAULTS[mode]
     ),
@@ -109,6 +111,7 @@ function buildLegacyElements(settings, mode, titleText) {
         role: 'seasonText',
         text: String(settings.activeSeason || ''),
         ...SEASON_DEFAULTS[mode],
+        textAlign: settings.seasonTextAlign || SEASON_DEFAULTS[mode].textAlign,
       },
       SEASON_DEFAULTS[mode]
     ),
@@ -124,6 +127,9 @@ function buildLegacyElements(settings, mode, titleText) {
         fontSize: mode === 'overall' ? settings.overallHeaderFontSize : Math.max((settings.overallHeaderFontSize || 18) - 1, 14),
         fontFamily: mode === 'overall' ? settings.overallHeaderFontFamily : settings.overallHeaderFontFamily || 'Arial',
         fontWeight: mode === 'overall' ? settings.overallHeaderFontWeight : 'bold',
+        textAlign: mode === 'overall'
+          ? (settings.overallHeaderTextAlign || TITLE_DEFAULTS[mode].textAlign)
+          : (settings.roundHeaderTextAlign || settings.overallHeaderTextAlign || TITLE_DEFAULTS[mode].textAlign),
       },
       TITLE_DEFAULTS[mode]
     ),
@@ -206,23 +212,27 @@ export function applyEditorElementsToSettings(settings, mode, elements) {
       next.overallHeaderFontFamily = title.fontFamily || next.overallHeaderFontFamily;
       next.overallHeaderFontSize = title.fontSize || next.overallHeaderFontSize;
       next.overallHeaderFontWeight = title.fontWeight || next.overallHeaderFontWeight;
+      next.overallHeaderTextAlign = title.textAlign || next.overallHeaderTextAlign;
     } else {
       next.roundTitle = normalizeRoundTitleTemplate(title.text.replaceAll('\n', ' ').trim());
       next.overallHeaderFontFamily = title.fontFamily || next.overallHeaderFontFamily;
       next.overallHeaderFontSize = title.fontSize || next.overallHeaderFontSize;
       next.overallHeaderFontWeight = title.fontWeight || next.overallHeaderFontWeight;
+      next.roundHeaderTextAlign = title.textAlign || next.roundHeaderTextAlign || next.overallHeaderTextAlign;
     }
   }
 
   const leagueTitle = cleaned.find((element) => element.role === 'leagueTitle' && element.type === 'text');
   if (leagueTitle) {
     next.pdfLeagueTitle = leagueTitle.text;
+    next.pdfLeagueTitleAlign = leagueTitle.textAlign || next.pdfLeagueTitleAlign;
   }
 
   const seasonText = cleaned.find((element) => element.role === 'seasonText' && element.type === 'text');
   if (seasonText) {
     const numericSeason = Number(String(seasonText.text).replace(/[^0-9]/g, ''));
     next.activeSeason = Number.isFinite(numericSeason) && numericSeason > 0 ? numericSeason : next.activeSeason;
+    next.seasonTextAlign = seasonText.textAlign || next.seasonTextAlign;
   }
 
   const leftLogo = cleaned.find((element) => element.role === 'leftLogo' && element.type === 'image');

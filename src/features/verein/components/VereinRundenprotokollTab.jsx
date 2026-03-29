@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { ensureSupabaseSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
@@ -19,9 +19,13 @@ export default function VereinRundenprotokollTab({ verein }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [settings, setSettings] = useState(loadSeasonSettings());
+  const requestIdRef = useRef(0);
+  const loadAttemptRef = useRef(0);
 
   const load = useCallback(async ({ keepLoading = false } = {}) => {
     if (!verein?.vereinsname) return;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     await ensureSupabaseSession().catch(() => null);
     if (!keepLoading) setLoading(true);
     setError("");
@@ -32,13 +36,24 @@ export default function VereinRundenprotokollTab({ verein }) {
         ]);
         if (entryError) throw entryError;
         if (windowError) throw windowError;
+        if (requestId !== requestIdRef.current) return;
         setEntries(entryData || []);
         setWindows(windowData || []);
+        loadAttemptRef.current = 0;
     } catch {
+      if (requestId !== requestIdRef.current) return;
       logError("Rundenprotokolle konnten nicht geladen werden.");
+      if (loadAttemptRef.current < 1) {
+        loadAttemptRef.current += 1;
+        window.setTimeout(() => {
+          load({ keepLoading: true });
+        }, 800);
+      }
       setError("Rundenprotokolle konnten nicht geladen werden.");
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [verein?.vereinsname]);
 
@@ -52,6 +67,12 @@ export default function VereinRundenprotokollTab({ verein }) {
     };
     const handlePageShow = () => load({ keepLoading: true });
     const handleSettingsUpdate = (event) => setSettings(event?.detail || loadSeasonSettings());
+    const handleAdminRefresh = () => load({ keepLoading: true });
+    const handleTabActivated = (event) => {
+      if (event?.detail?.tab === "protokolle") {
+        load();
+      }
+    };
 
     retryTimer = window.setTimeout(() => {
       load({ keepLoading: true });
@@ -60,6 +81,8 @@ export default function VereinRundenprotokollTab({ verein }) {
     window.addEventListener("pageshow", handlePageShow);
     window.addEventListener("focus", handlePageShow);
     window.addEventListener("rtliga-settings-updated", handleSettingsUpdate);
+    window.addEventListener("rtliga-admin-refresh", handleAdminRefresh);
+    window.addEventListener("rtliga-verein-tab-activated", handleTabActivated);
     document.addEventListener("visibilitychange", handleVisibility);
     const unsubscribe = subscribeToTables({ tables: ["verein_ergebnisse", "zeitfenster"], onChange: () => load({ keepLoading: true }) });
 
@@ -68,6 +91,8 @@ export default function VereinRundenprotokollTab({ verein }) {
       window.removeEventListener("pageshow", handlePageShow);
       window.removeEventListener("focus", handlePageShow);
       window.removeEventListener("rtliga-settings-updated", handleSettingsUpdate);
+      window.removeEventListener("rtliga-admin-refresh", handleAdminRefresh);
+      window.removeEventListener("rtliga-verein-tab-activated", handleTabActivated);
       document.removeEventListener("visibilitychange", handleVisibility);
       unsubscribe?.();
     };

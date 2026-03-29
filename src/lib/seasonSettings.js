@@ -33,6 +33,10 @@ export const DEFAULT_SETTINGS = {
   overallHeaderFontFamily: "Arial",
   overallHeaderFontSize: 18,
   overallHeaderFontWeight: "bold",
+  overallHeaderTextAlign: "center",
+  roundHeaderTextAlign: "center",
+  pdfLeagueTitleAlign: "center",
+  seasonTextAlign: "center",
   editorElementsOverall: [],
   editorElementsRound: [],
 

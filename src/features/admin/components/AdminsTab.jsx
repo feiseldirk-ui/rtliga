@@ -186,6 +186,7 @@ export default function AdminsTab() {
   useEffect(() => {
     if (!verified) return undefined;
     setContentReloadKey((value) => value + 1);
+    window.dispatchEvent(new CustomEvent("rtliga-admin-tab-activated", { detail: { tab: activeTab } }));
     return undefined;
   }, [activeTab, verified]);
 

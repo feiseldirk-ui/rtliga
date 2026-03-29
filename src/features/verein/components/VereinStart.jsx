@@ -139,6 +139,7 @@ export default function VereinStart() {
 
   const [teilnehmer, setTeilnehmer] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [contentReloadKey, setContentReloadKey] = useState(0);
 
   const [form, setForm] = useState({
     vorname: "",
@@ -232,6 +233,13 @@ export default function VereinStart() {
 
     setActiveTab(nextTab);
   };
+
+
+  useEffect(() => {
+    if (!verein) return;
+    setContentReloadKey((value) => value + 1);
+    window.dispatchEvent(new CustomEvent("rtliga-verein-tab-activated", { detail: { tab: activeTab } }));
+  }, [activeTab, verein]);
 
   const requestLogout = () => {
     if (unsavedChangesRef.current || hasUnsavedChanges) {
@@ -494,7 +502,7 @@ export default function VereinStart() {
 
         {activeTab === "meine" && <VereinErgebnisseAnzeigen verein={verein} />}
 
-        {activeTab === "protokolle" && <VereinRundenprotokollTab verein={verein} />}
+        {activeTab === "protokolle" && <VereinRundenprotokollTab key={`protokolle-${contentReloadKey}`} verein={verein} />}
 
         {activeTab === "gesamt" && <GesamtergebnisseTab />}
       </div>
