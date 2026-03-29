@@ -22,15 +22,15 @@ export default function DashboardShell({
     .toUpperCase();
 
   return (
-    <div className="min-h-screen">
-      <div className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-3 py-2 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-[minmax(0,112px)_1fr_minmax(0,112px)] lg:grid-cols-[minmax(0,156px)_1fr_minmax(0,156px)]">
-            <div className="hidden min-h-[64px] items-start justify-start pt-2 md:flex">{leftSlot}</div>
+    <div className="min-h-screen bg-zinc-50">
+      <div className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="mx-auto max-w-[1750px] px-4 py-3 sm:px-6 lg:px-8">
+          <div className="grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
+            <div className="order-2 flex justify-start lg:order-none lg:pt-1">{leftSlot}</div>
 
-            <div className="order-1 min-w-0 md:order-none">
+            <div className="order-1 min-w-0 space-y-3 lg:order-none">
               {!hideStickyIdentity ? (
-                <div className="mb-4 flex min-w-0 items-center justify-center gap-3 sm:gap-4">
+                <div className="flex min-w-0 items-center justify-center gap-3 sm:gap-4">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border border-zinc-200 bg-white shadow-sm">
                     <span className="text-sm font-bold text-zinc-700">{initials || "V"}</span>
                   </div>
@@ -47,21 +47,14 @@ export default function DashboardShell({
               ) : null}
 
               {stickyContent ? <div>{stickyContent}</div> : null}
-
-              {(leftSlot || right) ? (
-                <div className="mt-3 flex items-start justify-between gap-3 md:hidden">
-                  <div className="min-w-0 flex-1">{leftSlot}</div>
-                  <div className="min-w-0 flex-1">{right}</div>
-                </div>
-              ) : null}
             </div>
 
-            <div className="hidden min-h-[64px] items-start justify-end pt-2 md:flex">{right}</div>
+            <div className="order-3 flex justify-start lg:justify-end lg:pt-1">{right}</div>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1750px] px-4 py-6 sm:px-6 lg:px-8">
         {!hideHero ? (
           <div className="mb-6 overflow-hidden rounded-3xl border border-zinc-200 bg-gradient-to-r from-white via-indigo-50 to-emerald-50 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
             <div className="px-6 py-7 sm:px-8">

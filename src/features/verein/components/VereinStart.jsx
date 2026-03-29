@@ -28,35 +28,30 @@ function Tabs({ active, onTabChange }) {
   ];
 
   return (
-    <div className="rounded-3xl border border-zinc-200 bg-white px-3 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.05)] sm:px-5 sm:py-5 sm:px-6">
-      <div className="mb-3 flex items-center justify-between gap-3 sm:hidden">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Bereiche</p>
-        <p className="text-xs text-zinc-400">Wischen oder tippen</p>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {items.map((t) => {
+          const isActive = active === t.key;
+
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => onTabChange(t.key)}
+              className={isActive
+                ? "btn btn-primary whitespace-nowrap !rounded-2xl !px-4 !py-2.5 text-sm shadow-[0_16px_32px_rgba(99,102,241,0.24)] sm:!px-5 sm:!py-3"
+                : "btn btn-secondary whitespace-nowrap !rounded-2xl !px-4 !py-2.5 text-sm border-zinc-300 bg-white/90 hover:border-indigo-200 hover:bg-indigo-50/60 sm:!px-5 sm:!py-3"
+              }
+              aria-pressed={isActive}
+            >
+              <span className="sm:hidden">{t.shortLabel}</span>
+              <span className="hidden sm:inline">{t.label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="-mx-1 overflow-x-auto pb-1 sm:mx-0">
-        <div className="flex min-w-max gap-2 px-1 sm:flex-wrap sm:gap-3 sm:px-0">
-          {items.map((t) => {
-            const isActive = active === t.key;
-
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => onTabChange(t.key)}
-                className={isActive
-                  ? "btn btn-primary whitespace-nowrap !rounded-2xl !px-4 !py-2.5 text-sm shadow-[0_16px_32px_rgba(99,102,241,0.24)] sm:!px-5 sm:!py-3"
-                  : "btn btn-secondary whitespace-nowrap !rounded-2xl !px-4 !py-2.5 text-sm border-zinc-300 bg-white/90 hover:border-indigo-200 hover:bg-indigo-50/60 sm:!px-5 sm:!py-3"
-                }
-                aria-pressed={isActive}
-              >
-                <span className="sm:hidden">{t.shortLabel}</span>
-                <span className="hidden sm:inline">{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <div className="mx-auto h-px w-full max-w-md bg-zinc-200" />
     </div>
   );
 }
@@ -452,10 +447,10 @@ export default function VereinStart() {
       stickyContent={
         <div className="space-y-3">
           <Tabs active={activeTab} onTabChange={requestTabChange} />
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center">
+          <div className="flex justify-center pt-1">
             <button
               type="button"
-              className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-600 shadow-sm transition hover:border-rose-300 hover:bg-rose-100 sm:w-auto"
+              className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-600 shadow-sm transition hover:border-rose-300 hover:bg-rose-100 sm:text-base"
               onClick={requestLogout}
             >
               Vereinsbereich verlassen
