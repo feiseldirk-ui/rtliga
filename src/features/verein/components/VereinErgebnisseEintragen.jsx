@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { loadSeasonSettings } from "../../../lib/seasonSettings";
 
@@ -245,7 +245,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
   }, [dirtyIndex, onRegisterUnsavedActions, onDirtyChange, activeSeason, verein?.id, teilnehmer]);
 
   const fetchTeilnehmer = async () => {
-    await ensureSupabaseSession();
+    await waitForSession(4000);
 
     const { data: teilnehmerData, error: teilnehmerError } = await supabase
       .from("verein_teilnehmer")
@@ -295,7 +295,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
   };
 
   const fetchZeitfenster = async () => {
-    await ensureSupabaseSession();
+    await waitForSession(4000);
     const { data, error } = await supabase
       .from("zeitfenster")
       .select("*")

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
 import { exportRoundProtocolPdf } from "../../../lib/pdfExport";
@@ -26,7 +26,7 @@ export default function VereinRundenprotokollTab({ verein }) {
     if (!verein?.vereinsname) return;
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    await ensureSupabaseSession().catch(() => null);
+    await waitForSession(4000);
     if (!keepLoading) setLoading(true);
     setError("");
     try {

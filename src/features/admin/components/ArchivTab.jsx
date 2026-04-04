@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { loadSeasonSettings, saveSeasonSettings, saveSeasonSettingsToSupabase, useIsNewSeasonAllowed } from "../../../lib/seasonSettings";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import { getActiveSeason } from "../../../lib/seasonScope";
 
 export default function ArchivTab() {
@@ -26,7 +26,7 @@ export default function ArchivTab() {
     setNotice(null);
 
     try {
-      await ensureSupabaseSession();
+      await waitForSession(4000);
       const { data, error } = await supabase.rpc("prepare_next_season", {
         p_current_season: activeSeason,
         p_next_season: nextSeason,

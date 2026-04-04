@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
 import { loadSeasonSettings } from "../../../lib/seasonSettings";
@@ -43,60 +43,55 @@ export default function RundenprotokollTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [settings, setSettings] = useState(loadSeasonSettings());
-  const loadAttemptRef = useRef(0);
   const requestIdRef = useRef(0);
+  const loadAttemptRef = useRef(0);
 
   const loadData = useCallback(async ({ keepLoading = false } = {}) => {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    if (!keepLoading) {
-      setLoading(true);
-    }
+
+    const isCurrent = () => requestId === requestIdRef.current;
+
+    if (!keepLoading) setLoading(true);
     setError("");
 
-    const runLoad = async () => {
-      const activeSeason = getActiveSeason();
-      return await withTimeout(
-        Promise.all([
-          seasonOrNullFilter(supabase.from("verein_ergebnisse").select("*"), activeSeason),
-          seasonOrNullFilter(supabase.from("zeitfenster").select("wettkampf, start, ende").order("wettkampf", { ascending: true }), activeSeason),
-        ]),
-        12000,
-      );
-    };
-
     try {
-      await ensureSupabaseSession({ retries: 4, interval: 120 }).catch(() => null);
-      let result;
-      try {
-        result = await runLoad();
-      } catch (firstError) {
-        await new Promise((resolve) => window.setTimeout(resolve, 350));
-        result = await runLoad();
-      }
-      const [{ data: entryData, error: entryError }, { data: windowData, error: windowError }] = result;
+      // Session zuverlässig abwarten bevor Query
+      await waitForSession(4000);
+      if (!isCurrent()) return;
 
+      const activeSeason = getActiveSeason();
+      const [{ data: entryData, error: entryError }, { data: windowData, error: windowError }] =
+        await withTimeout(
+          Promise.all([
+            seasonOrNullFilter(supabase.from("verein_ergebnisse").select("*"), activeSeason),
+            seasonOrNullFilter(
+              supabase.from("zeitfenster").select("wettkampf, start, ende").order("wettkampf", { ascending: true }),
+              activeSeason,
+            ),
+          ]),
+          15000,
+        );
+
+      if (!isCurrent()) return;
       if (entryError) throw entryError;
       if (windowError) throw windowError;
 
-      if (requestId !== requestIdRef.current) return;
       setEntries(entryData || []);
       setWindows(windowData || []);
       loadAttemptRef.current = 0;
     } catch (err) {
-      if (requestId !== requestIdRef.current) return;
+      if (!isCurrent()) return;
       logError("Rundenergebnisse konnten nicht geladen werden.", err);
+      // Genau ein automatischer Retry
       if (loadAttemptRef.current < 1) {
         loadAttemptRef.current += 1;
-        window.setTimeout(() => {
-          loadData({ keepLoading: true });
-        }, 800);
+        window.setTimeout(() => loadData({ keepLoading: true }), 1200);
+      } else {
+        setError("Rundenergebnisse konnten nicht geladen werden. Bitte Seite neu laden.");
       }
-      setError("Rundenergebnisse konnten nicht geladen werden.");
     } finally {
-      if (requestId === requestIdRef.current) {
-        setLoading(false);
-      }
+      if (isCurrent()) setLoading(false);
     }
   }, []);
 
@@ -104,49 +99,31 @@ export default function RundenprotokollTab() {
     const handleSettingsUpdate = (event) => {
       setSettings(event?.detail || loadSeasonSettings());
     };
-    window.addEventListener("rtliga-settings-updated", handleSettingsUpdate);
-    let retryTimer;
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") loadData({ keepLoading: true });
+    };
+    const handleRefresh = () => loadData({ keepLoading: true });
+    const handleTabActivated = (event) => {
+      if (event?.detail?.tab === "protokoll") loadData();
+    };
 
     loadData();
 
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        loadData({ keepLoading: true });
-      }
-    };
-
-    const handlePageShow = () => {
-      loadData({ keepLoading: true });
-    };
-    const handleAdminRefresh = () => {
-      loadData({ keepLoading: true });
-    };
-    const handleTabActivated = (event) => {
-      if (event?.detail?.tab === "protokoll") {
-        loadData();
-      }
-    };
-
-    retryTimer = window.setTimeout(() => {
-      loadData({ keepLoading: true });
-    }, 900);
-
-    window.addEventListener("pageshow", handlePageShow);
-    window.addEventListener("focus", handlePageShow);
-    window.addEventListener("rtliga-admin-refresh", handleAdminRefresh);
+    window.addEventListener("rtliga-settings-updated", handleSettingsUpdate);
+    window.addEventListener("rtliga-admin-refresh", handleRefresh);
     window.addEventListener("rtliga-admin-tab-activated", handleTabActivated);
     document.addEventListener("visibilitychange", handleVisibility);
-    const unsubscribe = subscribeToTables({ tables: ["verein_ergebnisse", "zeitfenster"], onChange: () => loadData({ keepLoading: true }) });
+    const unsubscribe = subscribeToTables({
+      tables: ["verein_ergebnisse", "zeitfenster"],
+      onChange: () => loadData({ keepLoading: true }),
+    });
 
     return () => {
-      window.clearTimeout(retryTimer);
-      window.removeEventListener("pageshow", handlePageShow);
-      window.removeEventListener("focus", handlePageShow);
-      window.removeEventListener("rtliga-admin-refresh", handleAdminRefresh);
+      window.removeEventListener("rtliga-settings-updated", handleSettingsUpdate);
+      window.removeEventListener("rtliga-admin-refresh", handleRefresh);
       window.removeEventListener("rtliga-admin-tab-activated", handleTabActivated);
       document.removeEventListener("visibilitychange", handleVisibility);
       unsubscribe?.();
-      window.removeEventListener("rtliga-settings-updated", handleSettingsUpdate);
     };
   }, [loadData]);
 

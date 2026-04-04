@@ -3,12 +3,10 @@ import { useNavigate } from "react-router-dom";
 import supabase from "../../../lib/supabase/client";
 import { clearVereinSession, readVereinSession } from "../../../lib/storage/vereinSession";
 import { stopGlobalAudio } from "../../../shared/media/audioPlayer";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 
-import DashboardShell from "../../../shared/ui/dashboard/DashboardShell";
 import TeilnehmerPanel from "../../../shared/ui/dashboard/TeilnehmerPanel";
-import StatCards from "../../../shared/ui/dashboard/StatCards";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
 
 import VereinErgebnisseEintragen from "./VereinErgebnisseEintragen";
@@ -17,44 +15,6 @@ import GesamtergebnisseTab from "./GesamtergebnisseTab";
 import VereinRundenprotokollTab from "./VereinRundenprotokollTab";
 
 const ALTERS_KLASSEN = ["Schüler", "Jugend", "Junioren", "Damen", "Herren", "Altersklasse"];
-
-function Tabs({ active, onTabChange }) {
-  const items = [
-    { key: "teilnehmer", label: "Teilnehmer", shortLabel: "Teilnehmer" },
-    { key: "ergebnisse", label: "Ergebnisse erfassen", shortLabel: "Erfassen" },
-    { key: "meine", label: "Meine Ergebnisse", shortLabel: "Ergebnisse" },
-    { key: "protokolle", label: "Rundenprotokolle", shortLabel: "Protokolle" },
-    { key: "gesamt", label: "Gesamtrangliste", shortLabel: "Rangliste" },
-  ];
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        {items.map((t) => {
-          const isActive = active === t.key;
-
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => onTabChange(t.key)}
-              className={isActive
-                ? "btn btn-primary whitespace-nowrap !rounded-2xl !px-4 !py-2.5 text-sm shadow-[0_16px_32px_rgba(99,102,241,0.24)] sm:!px-5 sm:!py-3"
-                : "btn btn-secondary whitespace-nowrap !rounded-2xl !px-4 !py-2.5 text-sm border-zinc-300 bg-white/90 hover:border-indigo-200 hover:bg-indigo-50/60 sm:!px-5 sm:!py-3"
-              }
-              aria-pressed={isActive}
-            >
-              <span className="sm:hidden">{t.shortLabel}</span>
-              <span className="hidden sm:inline">{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mx-auto h-px w-full max-w-md bg-zinc-200" />
-    </div>
-  );
-}
 
 
 function UnsavedChangesModal({ open, actionType, onSave, onDiscard, onCancel, busy = false }) {
@@ -155,7 +115,7 @@ export default function VereinStart() {
       const v = { ...gespeicherterVerein, ...(verein || {}) };
       setVerein(v);
 
-      const session = await ensureSupabaseSession();
+      const session = await waitForSession(4000);
       if (!session) {
         clearVereinSession();
         navigate("/login");
@@ -435,72 +395,144 @@ export default function VereinStart() {
 
   if (!verein) return null;
 
+  const tabItems = [
+    { key: "teilnehmer",  label: "Teilnehmer",   short: "Teiln." },
+    { key: "ergebnisse",  label: "Erfassen",      short: "Erfassen" },
+    { key: "meine",       label: "Meine Ergebn.", short: "Meine" },
+    { key: "protokolle",  label: "Protokolle",    short: "Proto." },
+    { key: "gesamt",      label: "Rangliste",     short: "Rang." },
+  ];
+
   return (
-    <DashboardShell
-      titleTop="Verein"
-      title={verein.vereinsname || "Vereinbereich"}
-      subtitle="Zentrale Oberfläche für Teilnehmer, Ergebniserfassung, Ranglisten und Medien im Light Mode."
-      hideStickyIdentity
-      hideHero
-      leftSlot={<MediaPanel compact showIntro={false} filterType="audio" areaLabel="Vereinsmedien" />}
-      right={<MediaPanel compact showIntro={false} filterType="video" areaLabel="Vereinsmedien" />}
-      stickyContent={
-        <div className="space-y-3">
-          <Tabs active={activeTab} onTabChange={requestTabChange} />
-          <div className="flex justify-center pt-1">
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-600 shadow-sm transition hover:border-rose-300 hover:bg-rose-100 sm:text-base"
-              onClick={requestLogout}
-            >
-              Vereinsbereich verlassen
-            </button>
+    <div className="min-h-screen bg-zinc-50">
+
+      {/* ── Sticky Header ─────────────────────────────────────────── */}
+      <div className="sticky top-0 z-40 bg-white border-b border-zinc-200 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
+
+        {/* Farbstreifen oben */}
+        <div className="h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-500" />
+
+        <div className="mx-auto max-w-[1400px] px-3 sm:px-5 lg:px-8">
+
+          {/* Hauptzeile: Logo · Name · Logout */}
+          <div className="flex items-center justify-between gap-3 py-2.5">
+
+            {/* Links: Vereinsname */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">
+                <span className="text-xs font-bold leading-none">
+                  {(verein.vereinsname || "V").slice(0, 2).toUpperCase()}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-500 leading-none">Vereinsbereich</p>
+                <h1 className="text-base font-bold text-zinc-900 truncate leading-tight mt-0.5">{verein.vereinsname}</h1>
+              </div>
+            </div>
+
+            {/* Mitte: Stats als kleine Badges */}
+            <div className="hidden md:flex items-center gap-1.5 shrink-0">
+              <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-600">
+                {stats.total} Teiln.
+              </span>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                {stats.mitErgebnissen} mit Erg.
+              </span>
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                {stats.ohneErgebnisse} offen
+              </span>
+            </div>
+
+            {/* Rechts: Media-Chips + Logout */}
+            <div className="flex items-center gap-2 shrink-0">
+              <MediaPanel compact showIntro={false} filterType="audio" areaLabel="Audio" />
+              <MediaPanel compact showIntro={false} filterType="video" areaLabel="Video" />
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-100 active:scale-95"
+                onClick={requestLogout}
+              >
+                <span className="text-sm leading-none">⏻</span>
+                <span className="hidden sm:inline">Verlassen</span>
+              </button>
+            </div>
           </div>
-          <div className="flex justify-center overflow-x-auto">
-            <StatCards
-              compact
-              total={stats.total}
-              mitErgebnissen={stats.mitErgebnissen}
-              ohneErgebnisse={stats.ohneErgebnisse}
-            />
+
+          {/* Tab-Zeile: horizontal scrollbar, kein Wrap */}
+          <div className="flex items-center gap-1 pb-2 overflow-x-auto scrollbar-none -mx-1 px-1">
+            {tabItems.map((t) => {
+              const isActive = activeTab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => requestTabChange(t.key)}
+                  aria-pressed={isActive}
+                  className={[
+                    "shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold transition-all duration-150",
+                    isActive
+                      ? "bg-indigo-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)]"
+                      : "border border-zinc-200 bg-white text-zinc-600 hover:border-indigo-200 hover:text-indigo-700 hover:bg-indigo-50/60",
+                  ].join(" ")}
+                >
+                  <span className="sm:hidden">{t.short}</span>
+                  <span className="hidden sm:inline">{t.label}</span>
+                </button>
+              );
+            })}
+
+            {/* Stats mobil – ganz rechts in der Tab-Zeile */}
+            <div className="ml-auto flex md:hidden items-center gap-1 shrink-0 pl-2">
+              <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
+                {stats.total}
+              </span>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                {stats.mitErgebnissen}✓
+              </span>
+            </div>
           </div>
         </div>
-      }
-    >
-      <div className="space-y-6">
-        {activeTab === "teilnehmer" && (
-          <TeilnehmerPanel
-            teilnehmer={teilnehmer}
-            form={form}
-            setForm={setForm}
-            bearbeiteId={bearbeiteId}
-            onAdd={onAdd}
-            onUpdate={onUpdate}
-            onCancelEdit={onCancelEdit}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            gesperrtFn={gesperrtFn}
-            altersklassen={ALTERS_KLASSEN}
-            loading={loading}
-          />
-        )}
-
-        {activeTab === "ergebnisse" && (
-          <VereinErgebnisseEintragen
-            verein={verein}
-            teilnehmer={teilnehmer}
-            refreshTeilnehmer={refresh}
-            onDirtyChange={handleDirtyChange}
-            onRegisterUnsavedActions={registerUnsavedActions}
-          />
-        )}
-
-        {activeTab === "meine" && <VereinErgebnisseAnzeigen verein={verein} />}
-
-        {activeTab === "protokolle" && <VereinRundenprotokollTab key={`protokolle-${contentReloadKey}`} verein={verein} />}
-
-        {activeTab === "gesamt" && <GesamtergebnisseTab />}
       </div>
+      {/* ── Ende Header ────────────────────────────────────────────── */}
+
+      {/* Hauptinhalt */}
+      <div className="mx-auto max-w-[1400px] px-3 py-5 sm:px-5 lg:px-8">
+        <div className="space-y-5">
+          {activeTab === "teilnehmer" && (
+            <TeilnehmerPanel
+              teilnehmer={teilnehmer}
+              form={form}
+              setForm={setForm}
+              bearbeiteId={bearbeiteId}
+              onAdd={onAdd}
+              onUpdate={onUpdate}
+              onCancelEdit={onCancelEdit}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              gesperrtFn={gesperrtFn}
+              altersklassen={ALTERS_KLASSEN}
+              loading={loading}
+            />
+          )}
+
+          {activeTab === "ergebnisse" && (
+            <VereinErgebnisseEintragen
+              verein={verein}
+              teilnehmer={teilnehmer}
+              refreshTeilnehmer={refresh}
+              onDirtyChange={handleDirtyChange}
+              onRegisterUnsavedActions={registerUnsavedActions}
+            />
+          )}
+
+          {activeTab === "meine" && <VereinErgebnisseAnzeigen verein={verein} />}
+
+          {activeTab === "protokolle" && <VereinRundenprotokollTab key={`protokolle-${contentReloadKey}`} verein={verein} />}
+
+          {activeTab === "gesamt" && <GesamtergebnisseTab />}
+        </div>
+      </div>
+
       <UnsavedChangesModal
         open={showUnsavedModal}
         actionType={pendingAction?.type}
@@ -509,6 +541,6 @@ export default function VereinStart() {
         onCancel={handleModalCancel}
         busy={unsavedActionBusy}
       />
-    </DashboardShell>
+    </div>
   );
 }

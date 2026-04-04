@@ -26,7 +26,7 @@ export default function DashboardShell({
       <div className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mx-auto max-w-[1750px] px-4 py-3 sm:px-6 lg:px-8">
           <div className="grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
-            <div className="order-2 flex justify-start lg:order-none lg:pt-1">{leftSlot}</div>
+            <div className="order-2 hidden justify-start lg:order-none lg:flex lg:pt-1">{leftSlot}</div>
 
             <div className="order-1 min-w-0 space-y-3 lg:order-none">
               {!hideStickyIdentity ? (
@@ -49,10 +49,17 @@ export default function DashboardShell({
               {stickyContent ? <div>{stickyContent}</div> : null}
             </div>
 
-            <div className="order-3 flex justify-start lg:justify-end lg:pt-1">{right}</div>
+            <div className="order-3 hidden justify-start lg:justify-end lg:flex lg:pt-1">{right}</div>
           </div>
         </div>
       </div>
+
+      {(leftSlot || right) ? (
+        <div className="mx-auto flex max-w-[1750px] flex-col gap-3 px-4 pt-4 sm:px-6 lg:hidden">
+          {leftSlot ? <div className="flex justify-center">{leftSlot}</div> : null}
+          {right ? <div className="flex justify-center">{right}</div> : null}
+        </div>
+      ) : null}
 
       <div className="mx-auto max-w-[1750px] px-4 py-6 sm:px-6 lg:px-8">
         {!hideHero ? (

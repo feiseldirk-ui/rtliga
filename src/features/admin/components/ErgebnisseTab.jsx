@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import * as XLSX from "xlsx";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
 import { exportOverallPdf } from "../../../lib/pdfExport";
@@ -9,6 +9,15 @@ import { loadSeasonSettings } from "../../../lib/seasonSettings";
 import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 
 const WK_ANZAHL = 9;
+
+async function withTimeout(promise, timeoutMs = 12000) {
+  return await Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+    }),
+  ]);
+}
 
 function parseNumber(text, key) {
   const match = String(text || "").match(new RegExp(`${key}=(\\d+)`, "i"));
@@ -34,102 +43,117 @@ const getGesamtBadgeClass = (index) => {
   return "bg-indigo-50 text-indigo-700 border-indigo-200";
 };
 
+function verarbeiteEintraege(eintraege) {
+  const teilnehmerMap = {};
+
+  eintraege.forEach((eintrag) => {
+    const key = `${eintrag.vorname} ${eintrag.nachname} ${eintrag.altersklasse}`;
+
+    if (!teilnehmerMap[key]) {
+      teilnehmerMap[key] = {
+        vorname: eintrag.vorname,
+        nachname: eintrag.nachname,
+        altersklasse: eintrag.altersklasse,
+        verein: eintrag.verein,
+        punkte: Array(WK_ANZAHL).fill(0),
+      };
+    }
+
+    const wkIndex = Number(eintrag.wettkampf) - 1;
+    const gesamt = getWkGesamt(eintrag);
+
+    if (!Number.isNaN(wkIndex) && wkIndex >= 0 && wkIndex < WK_ANZAHL) {
+      teilnehmerMap[key].punkte[wkIndex] = gesamt;
+    }
+  });
+
+  const gruppiert = {};
+  Object.values(teilnehmerMap).forEach((t) => {
+    if (!gruppiert[t.altersklasse]) gruppiert[t.altersklasse] = [];
+    const sorted = [...t.punkte].sort((a, b) => b - a);
+    const summe = sorted.slice(0, 6).reduce((acc, val) => acc + val, 0);
+    const streicher = [...t.punkte]
+      .map((val, idx) => ({ val, idx }))
+      .sort((a, b) => a.val - b.val)
+      .slice(0, 3)
+      .map((e) => e.idx);
+
+    gruppiert[t.altersklasse].push({ ...t, gesamt: summe, streicher });
+  });
+
+  Object.keys(gruppiert).forEach((klasse) => {
+    gruppiert[klasse].sort((a, b) => b.gesamt - a.gesamt);
+  });
+
+  return gruppiert;
+}
+
 const ErgebnisseTab = () => {
   const [gruppierteErgebnisse, setGruppierteErgebnisse] = useState({});
   const [exportFormat, setExportFormat] = useState("xlsx");
   const [rohEintraege, setRohEintraege] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const requestIdRef = useRef(0);
 
-  const ladeUndVerarbeiteErgebnisse = React.useCallback(async () => {
-    await ensureSupabaseSession();
-    const activeSeason = getActiveSeason();
-    const { data, error } = await seasonOrNullFilter(supabase.from("verein_ergebnisse").select("*"), activeSeason);
+  const ladeUndVerarbeiteErgebnisse = useCallback(async ({ keepLoading = false } = {}) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    if (!keepLoading) setLoading(true);
 
-    if (error) {
-      logError("Daten konnten nicht geladen werden.");
-      return;
+    const isCurrent = () => requestId === requestIdRef.current;
+
+    try {
+      await waitForSession(4000);
+      if (!isCurrent()) return;
+
+      const activeSeason = getActiveSeason();
+      const { data, error } = await withTimeout(
+        seasonOrNullFilter(supabase.from("verein_ergebnisse").select("*"), activeSeason),
+        15000,
+      );
+
+      if (!isCurrent()) return;
+      if (error) throw error;
+
+      const eintraege = data || [];
+      setRohEintraege(eintraege.length);
+      setGruppierteErgebnisse(verarbeiteEintraege(eintraege));
+    } catch (err) {
+      if (!isCurrent()) return;
+      logError("Gesamtergebnisse konnten nicht geladen werden.", err);
+    } finally {
+      if (isCurrent()) setLoading(false);
     }
-
-    const eintraege = data || [];
-    setRohEintraege(eintraege.length);
-
-    const teilnehmerMap = {};
-
-    eintraege.forEach((eintrag) => {
-      const key = `${eintrag.vorname} ${eintrag.nachname} ${eintrag.altersklasse}`;
-
-      if (!teilnehmerMap[key]) {
-        teilnehmerMap[key] = {
-          vorname: eintrag.vorname,
-          nachname: eintrag.nachname,
-          altersklasse: eintrag.altersklasse,
-          verein: eintrag.verein,
-          punkte: Array(WK_ANZAHL).fill(0),
-        };
-      }
-
-      const wkIndex = Number(eintrag.wettkampf) - 1;
-      const gesamt = getWkGesamt(eintrag);
-
-      if (!Number.isNaN(wkIndex) && wkIndex >= 0 && wkIndex < WK_ANZAHL) {
-        teilnehmerMap[key].punkte[wkIndex] = gesamt;
-      }
-    });
-
-    const teilnehmerListe = Object.values(teilnehmerMap);
-
-    const gruppiert = {};
-    teilnehmerListe.forEach((t) => {
-      if (!gruppiert[t.altersklasse]) gruppiert[t.altersklasse] = [];
-      const beste6 = berechneBeste6(t.punkte);
-
-      gruppiert[t.altersklasse].push({
-        ...t,
-        gesamt: beste6.summe,
-        streicher: beste6.streicher,
-      });
-    });
-
-    Object.keys(gruppiert).forEach((klasse) => {
-      gruppiert[klasse].sort((a, b) => b.gesamt - a.gesamt);
-    });
-
-    setGruppierteErgebnisse(gruppiert);
   }, []);
 
   useEffect(() => {
     ladeUndVerarbeiteErgebnisse();
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        ladeUndVerarbeiteErgebnisse();
-      }
+      if (document.visibilityState === "visible") ladeUndVerarbeiteErgebnisse({ keepLoading: true });
+    };
+    const handleAdminRefresh = () => ladeUndVerarbeiteErgebnisse({ keepLoading: true });
+    const handleTabActivated = (event) => {
+      if (event?.detail?.tab === "ergebnisse") ladeUndVerarbeiteErgebnisse();
     };
 
-    const handleAdminRefresh = () => ladeUndVerarbeiteErgebnisse();
-    window.addEventListener("pageshow", ladeUndVerarbeiteErgebnisse);
+    window.addEventListener("pageshow", handleAdminRefresh);
     window.addEventListener("rtliga-admin-refresh", handleAdminRefresh);
+    window.addEventListener("rtliga-admin-tab-activated", handleTabActivated);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      window.removeEventListener("pageshow", ladeUndVerarbeiteErgebnisse);
+      window.removeEventListener("pageshow", handleAdminRefresh);
       window.removeEventListener("rtliga-admin-refresh", handleAdminRefresh);
+      window.removeEventListener("rtliga-admin-tab-activated", handleTabActivated);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [ladeUndVerarbeiteErgebnisse]);
 
-  useEffect(() => subscribeToTables({ tables: ["verein_ergebnisse"], onChange: ladeUndVerarbeiteErgebnisse }), [ladeUndVerarbeiteErgebnisse]);
+  useEffect(() => subscribeToTables({ tables: ["verein_ergebnisse"], onChange: () => ladeUndVerarbeiteErgebnisse({ keepLoading: true }) }), [ladeUndVerarbeiteErgebnisse]);
 
-  const berechneBeste6 = (punkte) => {
-    const sortiert = [...punkte].sort((a, b) => b - a);
-    const summe = sortiert.slice(0, 6).reduce((acc, val) => acc + val, 0);
-    const streicher = [...punkte]
-      .map((val, idx) => ({ val, idx }))
-      .sort((a, b) => a.val - b.val)
-      .slice(0, 3)
-      .map((e) => e.idx);
-
-    return { summe, streicher };
-  };
+  const altersklassenCount = useMemo(() => Object.keys(gruppierteErgebnisse).length, [gruppierteErgebnisse]);
+  const teilnehmerGesamt = useMemo(() => Object.values(gruppierteErgebnisse).reduce((sum, list) => sum + list.length, 0), [gruppierteErgebnisse]);
 
   const handleExport = () => {
     if (exportFormat === "xlsx") {
@@ -201,21 +225,11 @@ const ErgebnisseTab = () => {
     }
   };
 
-  const altersklassenCount = useMemo(
-    () => Object.keys(gruppierteErgebnisse).length,
-    [gruppierteErgebnisse]
-  );
-
-  const teilnehmerGesamt = useMemo(
-    () =>
-      Object.values(gruppierteErgebnisse).reduce(
-        (summe, gruppe) => summe + gruppe.length,
-        0
-      ),
-    [gruppierteErgebnisse]
-  );
-
   const exportLabel = exportFormat.toUpperCase();
+
+  if (loading) {
+    return <div className="rounded-3xl border border-zinc-200 bg-white px-5 py-10 text-center text-sm text-zinc-500 shadow-sm">Gesamtergebnisse werden geladen…</div>;
+  }
 
   return (
     <div className="space-y-6">

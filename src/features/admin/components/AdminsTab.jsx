@@ -130,7 +130,7 @@ export default function AdminsTab() {
         return;
       }
 
-      await ensureSupabaseSession();
+      await waitForSession(4000);
 
       const { data: adminRow, error: adminError } = await supabase
         .from("admins")
@@ -396,75 +396,81 @@ export default function AdminsTab() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <div className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur">
-        <div className="mx-auto max-w-[1750px] px-4 py-3 sm:px-6 lg:px-8">
-          <div className="grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
-            <div className="flex justify-start lg:pt-1">
-              <MediaPanel compact showIntro={false} filterType="audio" />
-            </div>
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 shadow-[0_4px_16px_rgba(15,23,42,0.07)] backdrop-blur">
+        {/* Akzentstreifen */}
+        <div className="h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500" />
+        <div className="mx-auto max-w-[1750px] px-4 sm:px-6 lg:px-8">
 
-            <div className="space-y-3">
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {tabs.map((tab) => {
-                    const isActive = activeTab === tab.key;
-                    return (
-                      <button
-                        key={tab.key}
-                        type="button"
-                        onClick={() => setActiveTab(tab.key)}
-                        className={isActive ? "btn btn-primary" : "btn btn-secondary"}
-                      >
-                        {tab.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="mx-auto h-px w-full max-w-md bg-zinc-200" />
-
-                <div className="flex justify-center pt-1">
-                  <button
-                    className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-base font-semibold text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    type="button"
-                    onClick={logout}
-                    disabled={loggingOut}
-                  >
-                    <span className="text-lg leading-none">⏻</span>
-                    <span>{loggingOut ? "Zur Startseite…" : "Adminbereich verlassen"}</span>
-                  </button>
-                </div>
+          {/* Zeile 1: Identity + Media-Chips + Stats + Logout */}
+          <div className="flex items-center justify-between gap-3 py-2 border-b border-zinc-100">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
+                <span className="text-xs font-bold">A</span>
               </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <div className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 shadow-sm">
-                  Admin: {adminEmail || "unbekannt"}
-                </div>
+              <span className="text-sm font-semibold text-zinc-900 truncate hidden sm:block">RTLiga Admin</span>
+              <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 truncate max-w-[160px]">
+                {adminEmail || "unbekannt"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="hidden lg:flex items-center gap-2">
                 <StatBadge label="Vereine" value={stats.vereine} />
                 <StatBadge label="Teilnehmer" value={stats.teilnehmer} />
-                <StatBadge label="Offene WK" value={stats.offeneZeitfenster} />
-                <StatBadge label="Rundenergebnisse" value={stats.ergebnisse} />
-                <StatBadge label="Gesamtergebnisse" value={stats.ergebnisse} />
+                <StatBadge label="WK" value={stats.offeneZeitfenster} />
+                <StatBadge label="Erg." value={stats.ergebnisse} />
               </div>
-            </div>
-
-            <div className="flex justify-start lg:justify-end lg:pt-1">
+              <MediaPanel compact showIntro={false} filterType="audio" />
               <MediaPanel compact showIntro={false} filterType="video" />
+              <button
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:opacity-60"
+                type="button"
+                onClick={logout}
+                disabled={loggingOut}
+              >
+                <span className="text-sm leading-none">⏻</span>
+                <span className="hidden sm:inline">{loggingOut ? "…" : "Verlassen"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Zeile 2: Tabs scrollbar */}
+          <div className="flex items-center gap-1.5 py-2 overflow-x-auto scrollbar-none -mx-1 px-1">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={[
+                    "shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold transition-all duration-150",
+                    isActive
+                      ? "bg-indigo-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)]"
+                      : "border border-zinc-200 bg-white text-zinc-600 hover:border-indigo-200 hover:text-indigo-700 hover:bg-indigo-50/60",
+                  ].join(" ")}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+            {/* Stats mobil */}
+            <div className="ml-auto lg:hidden flex items-center gap-1 shrink-0 pl-2">
+              <StatBadge label="V" value={stats.vereine} />
+              <StatBadge label="T" value={stats.teilnehmer} />
+              <StatBadge label="E" value={stats.ergebnisse} />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1750px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="space-y-6 rounded-[32px] border border-zinc-200 bg-white p-6 shadow-[0_1px_2px_rgba(16,24,40,0.05)] sm:p-8">
-          <div className="rounded-3xl border border-zinc-200 bg-zinc-50/80 px-5 py-5 shadow-inner">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Bereich</p>
-                <h3 className="mt-1 text-2xl font-semibold text-zinc-900">{activeTabData.title}</h3>
-              </div>
-              <p className="max-w-2xl text-sm text-zinc-600">{activeTabData.description}</p>
+      <div className="mx-auto max-w-[1750px] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="space-y-5 rounded-[28px] border border-zinc-200 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.05)] sm:p-6">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-1 pb-2 border-b border-zinc-100">
+            <div>
+              <h3 className="text-lg font-semibold text-zinc-900">{activeTabData.title}</h3>
             </div>
+            <p className="text-sm text-zinc-500 max-w-xl">{activeTabData.description}</p>
           </div>
 
           {activeTab === "vereine" ? <VereineTab key={`vereine-${contentReloadKey}`} onRefreshStats={ladeDashboardStats} /> : null}

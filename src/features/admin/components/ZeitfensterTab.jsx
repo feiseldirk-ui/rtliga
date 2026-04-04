@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import supabase from "../../../lib/supabase/client";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
 import { getActiveSeason, seasonOrNullFilter, withSeasonPayload } from "../../../lib/seasonScope";
@@ -139,7 +139,7 @@ export default function ZeitfensterTab({ onRefreshStats }) {
   const [openEditorKey, setOpenEditorKey] = useState(null);
 
   const fetchZeitfenster = React.useCallback(async () => {
-    await ensureSupabaseSession();
+    await waitForSession(4000);
     const activeSeason = getActiveSeason();
     const { data, error } = await seasonOrNullFilter(supabase.from("zeitfenster").select("*").order("wettkampf", { ascending: true }), activeSeason);
 

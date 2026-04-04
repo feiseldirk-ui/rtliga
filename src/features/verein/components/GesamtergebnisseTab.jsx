@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import supabase from "../../../lib/supabase/client";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
 import { exportOverallPdf } from "../../../lib/pdfExport";
@@ -44,7 +44,7 @@ export default function GesamtergebnisseTab() {
   useEffect(() => {
     const ladeDaten = async () => {
       try {
-        await ensureSupabaseSession();
+        await waitForSession(4000);
         const { data: zfData, error: zfError } = await supabase
           .from("zeitfenster")
           .select("wettkampf, start, ende");

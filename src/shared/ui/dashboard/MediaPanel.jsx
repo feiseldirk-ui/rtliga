@@ -402,26 +402,53 @@ export default function MediaPanel({
   };
 
   if (compact) {
+    // Micro-Chip-Modus: nur ein kleiner Button pro Medium, Floating Panel on demand
     const activeSignedUrl = activeItem ? signedUrls[activeItem.path] || "" : "";
 
     return (
       <>
-        <div className="flex w-full flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-start">
+        <div className="flex items-center gap-1.5">
           {visibleItems.map((item) => {
             const signedUrl = signedUrls[item.path] || "";
+            const isAudio = item.type === "audio";
+            const isThisOpen = activeItem?.id === item.id;
+            const isAudioPlaying = isAudio && audioState.currentItemId === item.id && audioState.isPlaying;
+
             return (
-              <CompactMediaCard
+              <button
                 key={item.id}
-                item={item}
-                signedUrl={signedUrl}
-                onDownload={handleDownload}
-                downloadingId={downloadingId}
-                unavailableReason={unavailableReason}
-                onOpen={(nextItem, rect) => setActiveItem({ ...nextItem, __anchorRect: rect })}
-                active={activeItem?.id === item.id || (item.type === "audio" && audioState.currentItemId === item.id)}
-                audioPlaying={item.type === "audio" && audioState.currentItemId === item.id && audioState.isPlaying}
-                onToggleAudio={handleToggleAudio}
-              />
+                type="button"
+                title={item.title}
+                aria-label={isAudio ? (isAudioPlaying ? "Audio pausieren" : "Audio abspielen") : `Video öffnen: ${item.title}`}
+                onClick={(e) => {
+                  if (isAudio && signedUrl) {
+                    handleToggleAudio(item, signedUrl);
+                    return;
+                  }
+                  if (isThisOpen) {
+                    setActiveItem(null);
+                    return;
+                  }
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setActiveItem({ ...item, __anchorRect: rect });
+                }}
+                className={[
+                  "inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition-all duration-150 select-none",
+                  isThisOpen || isAudioPlaying
+                    ? "border-indigo-300 bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.3)]"
+                    : "border-zinc-200 bg-white text-zinc-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700",
+                ].join(" ")}
+              >
+                <span className="text-[13px] leading-none">{isAudio ? "\u266a" : "\u25b6"}</span>
+                <span className="hidden lg:inline max-w-[90px] truncate">{item.title}</span>
+                {isAudioPlaying && (
+                  <span className="ml-0.5 flex items-end gap-[2px] h-3">
+                    <span className="w-[2px] rounded-full bg-white" style={{height:"8px",animation:"bounce 0.6s ease-in-out infinite"}} />
+                    <span className="w-[2px] rounded-full bg-white" style={{height:"5px",animation:"bounce 0.6s ease-in-out 0.15s infinite"}} />
+                    <span className="w-[2px] rounded-full bg-white" style={{height:"10px",animation:"bounce 0.6s ease-in-out 0.3s infinite"}} />
+                  </span>
+                )}
+              </button>
             );
           })}
         </div>

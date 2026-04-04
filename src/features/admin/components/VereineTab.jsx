@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import supabase from "../../../lib/supabase/client";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
@@ -31,7 +31,7 @@ const VereineTab = ({ onRefreshStats }) => {
   const fetchVereine = React.useCallback(async () => {
     setLoading(true);
     try {
-      await ensureSupabaseSession({ retries: 4, interval: 120 }).catch(() => null);
+      await waitForSession(4000);
       const activeSeason = getActiveSeason();
       const { data, error } = await supabase.from("vereine").select("*").order("vereinsname", { ascending: true });
       if (error) {

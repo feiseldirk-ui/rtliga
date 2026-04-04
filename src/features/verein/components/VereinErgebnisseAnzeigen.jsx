@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import supabase from "../../../lib/supabase/client";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
 
@@ -38,7 +38,7 @@ export default function VereinErgebnisseAnzeigen({ verein }) {
   const fetchErgebnisse = React.useCallback(async () => {
     if (!verein?.vereinsname) return;
 
-    await ensureSupabaseSession();
+    await waitForSession(4000);
 
     const { data, error } = await supabase
       .from("verein_ergebnisse")
