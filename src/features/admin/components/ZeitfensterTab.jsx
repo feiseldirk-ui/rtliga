@@ -34,11 +34,6 @@ function parseTimestamp(value) {
   return Number.isFinite(ts) ? ts : null;
 }
 
-function formatForInput(ts) {
-  if (ts == null) return "";
-  return new Date(ts).toISOString().slice(0, 16);
-}
-
 function sortFenster(list) {
   return [...list].sort((a, b) => a.wettkampf - b.wettkampf);
 }
@@ -79,15 +74,18 @@ function DateTimeEditor({ label, value, editorKey, openEditorKey, onToggle, onAp
   const [draftDate, setDraftDate] = useState(initial.date);
   const [draftTime, setDraftTime] = useState(initial.time || "16:00");
 
-  useEffect(() => {
-    setDraftDate(initial.date);
-    setDraftTime(initial.time || "16:00");
-    setLocalError("");
-  }, [initial, open]);
+  const handleToggle = () => {
+    if (!open) {
+      setDraftDate(initial.date);
+      setDraftTime(initial.time || "16:00");
+      setLocalError("");
+    }
+    onToggle(open ? null : editorKey);
+  };
 
   return (
     <div className="relative min-w-[220px] overflow-visible">
-      <button type="button" className="input flex min-h-[46px] items-center justify-between gap-3 text-left" onClick={() => onToggle(open ? null : editorKey)}>
+      <button type="button" className="input flex min-h-[46px] items-center justify-between gap-3 text-left" onClick={handleToggle}>
         <span className={value ? "text-zinc-900" : "text-zinc-400"}>{value ? new Date(value).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : label}</span>
         <span aria-hidden="true">🗓️</span>
       </button>
@@ -137,6 +135,12 @@ export default function ZeitfensterTab({ onRefreshStats }) {
   const [gespeichert, setGespeichert] = useState(null);
   const [savingWettkampf, setSavingWettkampf] = useState(null);
   const [openEditorKey, setOpenEditorKey] = useState(null);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), MINUTE_MS);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const fetchZeitfenster = React.useCallback(async () => {
     await waitForSession(4000);
@@ -155,13 +159,14 @@ export default function ZeitfensterTab({ onRefreshStats }) {
   }, [onRefreshStats]);
 
   useEffect(() => {
-    fetchZeitfenster();
+    const initialLoadTimer = window.setTimeout(fetchZeitfenster, 0);
     const handleVisibility = () => {
       if (document.visibilityState === "visible") fetchZeitfenster();
     };
     window.addEventListener("pageshow", fetchZeitfenster);
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
+      window.clearTimeout(initialLoadTimer);
       window.removeEventListener("pageshow", fetchZeitfenster);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
@@ -247,10 +252,9 @@ export default function ZeitfensterTab({ onRefreshStats }) {
 
   const istOffen = (startStr, endeStr) => {
     if (!startStr || !endeStr) return false;
-    const jetzt = new Date();
-    const start = new Date(startStr);
-    const ende = new Date(endeStr);
-    return jetzt >= start && jetzt <= ende;
+    const start = Date.parse(startStr);
+    const ende = Date.parse(endeStr);
+    return currentTime >= start && currentTime <= ende;
   };
 
   const formatDatum = (isoString) => {
@@ -292,7 +296,7 @@ export default function ZeitfensterTab({ onRefreshStats }) {
           const offen = istOffen(z.start, z.ende);
           const gesetzt = Boolean(z.start && z.ende);
           const geschlossen = gesetzt && !offen;
-          const startInZukunft = gesetzt && Date.parse(z.start) > Date.now();
+          const startInZukunft = gesetzt && Date.parse(z.start) > currentTime;
           const containerClass = offen ? "border-emerald-200 bg-emerald-50/50 shadow-[0_14px_34px_rgba(16,185,129,0.10)]" : startInZukunft ? "border-amber-200 bg-amber-50/55 shadow-[0_12px_30px_rgba(245,158,11,0.10)]" : geschlossen ? "border-rose-200 bg-rose-50/55 shadow-[0_12px_30px_rgba(244,63,94,0.08)]" : "border-zinc-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:border-zinc-300 hover:shadow-[0_12px_28px_rgba(16,24,40,0.08)]";
           const statusBadgeClass = offen ? "border-emerald-200 bg-emerald-100 text-emerald-800" : startInZukunft ? "border-amber-200 bg-amber-100 text-amber-800" : geschlossen ? "border-rose-200 bg-rose-100 text-rose-700" : "border-zinc-200 bg-zinc-50 text-zinc-600";
           const detailBadgeClass = gesetzt ? startInZukunft ? "border-amber-200 bg-white text-amber-700" : offen ? "border-emerald-200 bg-white text-emerald-700" : "border-rose-200 bg-white text-rose-700" : "border-zinc-200 bg-white text-zinc-500";

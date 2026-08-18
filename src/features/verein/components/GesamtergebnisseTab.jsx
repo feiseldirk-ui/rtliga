@@ -1,14 +1,26 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
 import { exportOverallPdf } from "../../../lib/pdfExport";
 import { loadSeasonSettings } from "../../../lib/seasonSettings";
+import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 
 const WK_ANZAHL = 9;
 const EMPTY_STATE_CLASS =
   "rounded-3xl border border-dashed border-zinc-300 bg-zinc-50 px-5 py-10 text-center text-sm text-zinc-500";
+
+function withTimeout(promise, timeoutMs = 15000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
 
 function parseNumber(text, key) {
   const match = String(text || "").match(new RegExp(`${key}=(\\d+)`, "i"));
@@ -39,49 +51,69 @@ export default function GesamtergebnisseTab() {
   const [zeitfenster, setZeitfenster] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const requestIdRef = useRef(0);
   const settings = loadSeasonSettings();
 
+  const ladeDaten = useCallback(async ({ keepLoading = false } = {}) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    if (!keepLoading) setLoading(true);
+    setError("");
+
+    try {
+      const session = await waitForSession(4000);
+      if (requestId !== requestIdRef.current) return;
+      if (!session) throw new Error("session-timeout");
+
+      const activeSeason = getActiveSeason();
+      const [{ data: zfData, error: zfError }, { data: ergData, error: ergError }] = await withTimeout(
+        Promise.all([
+          seasonOrNullFilter(
+            supabase.from("zeitfenster").select("wettkampf, start, ende"),
+            activeSeason,
+          ),
+          seasonOrNullFilter(supabase.from("verein_ergebnisse").select("*"), activeSeason),
+        ]),
+      );
+
+      if (requestId !== requestIdRef.current) return;
+      if (zfError) throw zfError;
+      if (ergError) throw ergError;
+
+      setZeitfenster(zfData || []);
+      setAlleErgebnisse(ergData || []);
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      logError("Gesamtergebnisse konnten nicht geladen werden.", err);
+      setError("Fehler beim Laden der Daten. Bitte den Bereich erneut öffnen.");
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const ladeDaten = async () => {
-      try {
-        await waitForSession(4000);
-        const { data: zfData, error: zfError } = await supabase
-          .from("zeitfenster")
-          .select("wettkampf, start, ende");
-
-        if (zfError) throw zfError;
-        setZeitfenster(zfData || []);
-
-        const { data: ergData, error: ergError } = await supabase
-          .from("verein_ergebnisse")
-          .select("*");
-
-        if (ergError) throw ergError;
-        setAlleErgebnisse(ergData || []);
-      } catch (err) {
-        logError("Gesamtergebnisse konnten nicht geladen werden.");
-        setError("Fehler beim Laden der Daten");
-      } finally {
-        setLoading(false);
-      }
-    };
 
     ladeDaten();
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") ladeDaten();
+      if (document.visibilityState === "visible") ladeDaten({ keepLoading: true });
     };
+    const handlePageShow = () => ladeDaten({ keepLoading: true });
 
-    window.addEventListener("pageshow", ladeDaten);
+    window.addEventListener("pageshow", handlePageShow);
     document.addEventListener("visibilitychange", handleVisibility);
-    const unsubscribe = subscribeToTables({ tables: ["verein_ergebnisse", "zeitfenster"], onChange: ladeDaten });
+    const unsubscribe = subscribeToTables({
+      tables: ["verein_ergebnisse", "zeitfenster"],
+      onChange: () => ladeDaten({ keepLoading: true }),
+    });
 
     return () => {
-      window.removeEventListener("pageshow", ladeDaten);
+      requestIdRef.current += 1;
+      window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibility);
       unsubscribe?.();
     };
-  }, []);
+  }, [ladeDaten]);
 
   const jetzt = new Date().getTime();
   const geschlosseneWks = zeitfenster
@@ -126,15 +158,8 @@ export default function GesamtergebnisseTab() {
     nachAltersklasse[p.altersklasse].push(p);
   });
 
-  const altersklassenCount = useMemo(
-    () => Object.keys(nachAltersklasse).length,
-    [alleErgebnisse, zeitfenster]
-  );
-
-  const teilnehmerCount = useMemo(
-    () => Object.values(gruppiert).length,
-    [alleErgebnisse, zeitfenster]
-  );
+  const altersklassenCount = Object.keys(nachAltersklasse).length;
+  const teilnehmerCount = Object.values(gruppiert).length;
 
 
   const handlePdfDownload = () => {

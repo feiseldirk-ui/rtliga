@@ -11,12 +11,16 @@ import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 const WK_ANZAHL = 9;
 
 async function withTimeout(promise, timeoutMs = 12000) {
-  return await Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
-    }),
-  ]);
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 function parseNumber(text, key) {
@@ -93,18 +97,21 @@ const ErgebnisseTab = () => {
   const [exportFormat, setExportFormat] = useState("xlsx");
   const [rohEintraege, setRohEintraege] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const requestIdRef = useRef(0);
 
   const ladeUndVerarbeiteErgebnisse = useCallback(async ({ keepLoading = false } = {}) => {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
     if (!keepLoading) setLoading(true);
+    setLoadError("");
 
     const isCurrent = () => requestId === requestIdRef.current;
 
     try {
-      await waitForSession(4000);
+      const session = await waitForSession(4000);
       if (!isCurrent()) return;
+      if (!session) throw new Error("session-timeout");
 
       const activeSeason = getActiveSeason();
       const { data, error } = await withTimeout(
@@ -121,6 +128,7 @@ const ErgebnisseTab = () => {
     } catch (err) {
       if (!isCurrent()) return;
       logError("Gesamtergebnisse konnten nicht geladen werden.", err);
+      setLoadError("Gesamtergebnisse konnten nicht geladen werden. Bitte den Bereich erneut öffnen.");
     } finally {
       if (isCurrent()) setLoading(false);
     }
@@ -133,19 +141,14 @@ const ErgebnisseTab = () => {
       if (document.visibilityState === "visible") ladeUndVerarbeiteErgebnisse({ keepLoading: true });
     };
     const handleAdminRefresh = () => ladeUndVerarbeiteErgebnisse({ keepLoading: true });
-    const handleTabActivated = (event) => {
-      if (event?.detail?.tab === "ergebnisse") ladeUndVerarbeiteErgebnisse();
-    };
-
     window.addEventListener("pageshow", handleAdminRefresh);
     window.addEventListener("rtliga-admin-refresh", handleAdminRefresh);
-    window.addEventListener("rtliga-admin-tab-activated", handleTabActivated);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
+      requestIdRef.current += 1;
       window.removeEventListener("pageshow", handleAdminRefresh);
       window.removeEventListener("rtliga-admin-refresh", handleAdminRefresh);
-      window.removeEventListener("rtliga-admin-tab-activated", handleTabActivated);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [ladeUndVerarbeiteErgebnisse]);
@@ -229,6 +232,10 @@ const ErgebnisseTab = () => {
 
   if (loading) {
     return <div className="rounded-3xl border border-zinc-200 bg-white px-5 py-10 text-center text-sm text-zinc-500 shadow-sm">Gesamtergebnisse werden geladen…</div>;
+  }
+
+  if (loadError) {
+    return <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-10 text-center text-sm text-rose-700 shadow-sm">{loadError}</div>;
   }
 
   return (

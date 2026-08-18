@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import supabase from "../../../lib/supabase/client";
 import { logError } from "../../../lib/logger";
-import { ensureSupabaseSession } from "../../../lib/authReady";
+import { waitForSession } from "../../../lib/authReady";
 import { subscribeToTables } from "../../../lib/realtime";
 import ZeitfensterTab from "./ZeitfensterTab";
 import ErgebnisseTab from "./ErgebnisseTab";
@@ -12,6 +12,7 @@ import ArchivTab from "./ArchivTab";
 import RundenprotokollTab from "./RundenprotokollTab";
 import AdminManagementTab from "./AdminManagementTab";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
+import { stopGlobalAudio } from "../../../shared/media/audioPlayer";
 import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 
 const INITIAL_STATS = {
@@ -55,7 +56,6 @@ export default function AdminsTab() {
   const [activeTab, setActiveTab] = useState("vereine");
   const [stats, setStats] = useState(INITIAL_STATS);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [contentReloadKey, setContentReloadKey] = useState(0);
 
   const tabs = useMemo(
     () => [
@@ -108,17 +108,24 @@ export default function AdminsTab() {
     }
   }, []);
 
-  const checkAdminSession = useCallback(async () => {
+  const checkAdminSession = useCallback(async (sessionOverride) => {
     try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error || !data?.session?.user) {
+      let session = sessionOverride;
+
+      if (sessionOverride === undefined) {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        session = data?.session || null;
+      }
+
+      if (!session?.user) {
         setVerified(false);
         setChecked(true);
         setStats(INITIAL_STATS);
         return;
       }
 
-      const currentUser = data.session.user;
+      const currentUser = session.user;
       const accessFlag = window.sessionStorage.getItem(ADMIN_ACCESS_FLAG_KEY);
 
       if (accessFlag !== "1") {
@@ -129,8 +136,6 @@ export default function AdminsTab() {
         setAdminEmail(currentUser.email || "");
         return;
       }
-
-      await waitForSession(4000);
 
       const { data: adminRow, error: adminError } = await supabase
         .from("admins")
@@ -162,11 +167,18 @@ export default function AdminsTab() {
 
   useEffect(() => {
     checkAdminSession();
+    let authTimer = null;
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => checkAdminSession());
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      window.clearTimeout(authTimer);
+      authTimer = window.setTimeout(() => checkAdminSession(session), 0);
+    });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      window.clearTimeout(authTimer);
+      subscription.unsubscribe();
+    };
   }, [checkAdminSession]);
 
   useEffect(() => {
@@ -183,13 +195,6 @@ export default function AdminsTab() {
     ladeDashboardStats();
   }, [activeTab, ladeDashboardStats, verified]);
 
-  useEffect(() => {
-    if (!verified) return undefined;
-    setContentReloadKey((value) => value + 1);
-    window.dispatchEvent(new CustomEvent("rtliga-admin-tab-activated", { detail: { tab: activeTab } }));
-    return undefined;
-  }, [activeTab, verified]);
-
   const handleAdminLogin = async (event) => {
     event.preventDefault();
     setLoading(true);
@@ -197,44 +202,51 @@ export default function AdminsTab() {
 
     const normalizedEmail = adminEmail.trim().toLowerCase();
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password: passwort,
-    });
-
-    if (error || !data?.user) {
-      setAuthError("Admin-Login fehlgeschlagen. Bitte Kennwort prüfen.");
-      setLoading(false);
-      return;
-    }
-
-    await ensureSupabaseSession();
-
-    const { data: adminRow, error: adminError } = await supabase
-      .from("admins")
-      .select("user_id")
-      .eq("user_id", data.user.id)
-      .maybeSingle();
-
-    if (adminError || !adminRow) {
-      await supabase.auth.signOut();
-      setAuthError("Das Konto ist nicht als Admin freigeschaltet.");
-      setLoading(false);
-      return;
-    }
-
     try {
-      window.sessionStorage.setItem(ADMIN_ACCESS_FLAG_KEY, "1");
-    } catch {
-      // noop
-    }
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: passwort,
+      });
 
-    setVerified(true);
-    setChecked(true);
-    setAdminEmail(data.user.email || normalizedEmail);
-    setPasswort("");
-    setLoading(false);
-    await ladeDashboardStats();
+      if (error || !data?.user) {
+        setAuthError("Admin-Login fehlgeschlagen. Bitte Kennwort prüfen.");
+        return;
+      }
+
+      const session = await waitForSession(4000);
+      if (!session) {
+        setAuthError("Die Admin-Sitzung konnte nicht geladen werden. Bitte erneut versuchen.");
+        return;
+      }
+
+      const { data: adminRow, error: adminError } = await supabase
+        .from("admins")
+        .select("user_id")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+
+      if (adminError || !adminRow) {
+        await supabase.auth.signOut();
+        setAuthError("Das Konto ist nicht als Admin freigeschaltet.");
+        return;
+      }
+
+      try {
+        window.sessionStorage.setItem(ADMIN_ACCESS_FLAG_KEY, "1");
+      } catch {
+        // noop
+      }
+
+      setVerified(true);
+      setChecked(true);
+      setAdminEmail(data.user.email || normalizedEmail);
+      setPasswort("");
+      await ladeDashboardStats();
+    } catch {
+      setAuthError("Admin-Login fehlgeschlagen. Bitte erneut versuchen.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const logout = async () => {
@@ -473,13 +485,13 @@ export default function AdminsTab() {
             <p className="text-sm text-zinc-500 max-w-xl">{activeTabData.description}</p>
           </div>
 
-          {activeTab === "vereine" ? <VereineTab key={`vereine-${contentReloadKey}`} onRefreshStats={ladeDashboardStats} /> : null}
-          {activeTab === "zeitfenster" ? <ZeitfensterTab key={`zeitfenster-${contentReloadKey}`} onRefreshStats={ladeDashboardStats} /> : null}
-          {activeTab === "protokoll" ? <RundenprotokollTab key={`protokoll-${contentReloadKey}`} /> : null}
-          {activeTab === "ergebnisse" ? <ErgebnisseTab key={`ergebnisse-${contentReloadKey}`} /> : null}
-          {activeTab === "pdf" ? <SaisonPdfTab key={`pdf-${contentReloadKey}`} /> : null}
-          {activeTab === "archiv" ? <ArchivTab key={`archiv-${contentReloadKey}`} /> : null}
-          {activeTab === "admins" ? <AdminManagementTab key={`admins-${contentReloadKey}`} /> : null}
+          {activeTab === "vereine" ? <VereineTab onRefreshStats={ladeDashboardStats} /> : null}
+          {activeTab === "zeitfenster" ? <ZeitfensterTab onRefreshStats={ladeDashboardStats} /> : null}
+          {activeTab === "protokoll" ? <RundenprotokollTab /> : null}
+          {activeTab === "ergebnisse" ? <ErgebnisseTab /> : null}
+          {activeTab === "pdf" ? <SaisonPdfTab /> : null}
+          {activeTab === "archiv" ? <ArchivTab /> : null}
+          {activeTab === "admins" ? <AdminManagementTab /> : null}
         </div>
       </div>
     </div>

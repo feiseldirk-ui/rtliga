@@ -6,12 +6,7 @@ import {
   getEditorElements,
 } from "./editorLayout";
 
-export function modeKey(mode, base) {
-  const prefix = mode === "round" ? "round" : "overall";
-  return `${prefix}${base}`;
-}
-
-export function classLabel(klasse) {
+function classLabel(klasse) {
   if (klasse?.toLowerCase().includes("klasse")) return klasse;
   return `${klasse}klasse`;
 }
@@ -175,7 +170,6 @@ export default function PdfPreviewPage({
   settings,
   mode,
   titleText,
-  seasonText,
   classes = [],
   activeField = "",
   editorMode = false,

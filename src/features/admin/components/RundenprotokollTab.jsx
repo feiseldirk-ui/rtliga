@@ -12,12 +12,16 @@ import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 
 
 async function withTimeout(promise, timeoutMs = 12000) {
-  return await Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
-    }),
-  ]);
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 function statusInfo(windowRow) {
@@ -45,8 +49,10 @@ export default function RundenprotokollTab() {
   const [settings, setSettings] = useState(loadSeasonSettings());
   const requestIdRef = useRef(0);
   const loadAttemptRef = useRef(0);
+  const retryTimerRef = useRef(null);
 
   const loadData = useCallback(async ({ keepLoading = false } = {}) => {
+    window.clearTimeout(retryTimerRef.current);
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
 
@@ -54,11 +60,13 @@ export default function RundenprotokollTab() {
 
     if (!keepLoading) setLoading(true);
     setError("");
+    let retryScheduled = false;
 
     try {
       // Session zuverlässig abwarten bevor Query
-      await waitForSession(4000);
+      const session = await waitForSession(4000);
       if (!isCurrent()) return;
+      if (!session) throw new Error("session-timeout");
 
       const activeSeason = getActiveSeason();
       const [{ data: entryData, error: entryError }, { data: windowData, error: windowError }] =
@@ -86,12 +94,13 @@ export default function RundenprotokollTab() {
       // Genau ein automatischer Retry
       if (loadAttemptRef.current < 1) {
         loadAttemptRef.current += 1;
-        window.setTimeout(() => loadData({ keepLoading: true }), 1200);
+        retryScheduled = true;
+        retryTimerRef.current = window.setTimeout(() => loadData({ keepLoading: true }), 1200);
       } else {
-        setError("Rundenergebnisse konnten nicht geladen werden. Bitte Seite neu laden.");
+        setError("Rundenergebnisse konnten nicht geladen werden. Bitte den Bereich erneut öffnen.");
       }
     } finally {
-      if (isCurrent()) setLoading(false);
+      if (isCurrent() && !retryScheduled) setLoading(false);
     }
   }, []);
 
@@ -103,15 +112,10 @@ export default function RundenprotokollTab() {
       if (document.visibilityState === "visible") loadData({ keepLoading: true });
     };
     const handleRefresh = () => loadData({ keepLoading: true });
-    const handleTabActivated = (event) => {
-      if (event?.detail?.tab === "protokoll") loadData();
-    };
-
     loadData();
 
     window.addEventListener("rtliga-settings-updated", handleSettingsUpdate);
     window.addEventListener("rtliga-admin-refresh", handleRefresh);
-    window.addEventListener("rtliga-admin-tab-activated", handleTabActivated);
     document.addEventListener("visibilitychange", handleVisibility);
     const unsubscribe = subscribeToTables({
       tables: ["verein_ergebnisse", "zeitfenster"],
@@ -119,9 +123,10 @@ export default function RundenprotokollTab() {
     });
 
     return () => {
+      requestIdRef.current += 1;
+      window.clearTimeout(retryTimerRef.current);
       window.removeEventListener("rtliga-settings-updated", handleSettingsUpdate);
       window.removeEventListener("rtliga-admin-refresh", handleRefresh);
-      window.removeEventListener("rtliga-admin-tab-activated", handleTabActivated);
       document.removeEventListener("visibilitychange", handleVisibility);
       unsubscribe?.();
     };

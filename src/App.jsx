@@ -69,14 +69,15 @@ function Auswahlseite() {
 }
 
 function AdminRoute() {
+  let shouldRedirect = false;
+
   try {
-    if (window.sessionStorage.getItem(ADMIN_LOGOUT_REDIRECT_KEY) === "1") {
-      return <Navigate to="/" replace />;
-    }
+    shouldRedirect = window.sessionStorage.getItem(ADMIN_LOGOUT_REDIRECT_KEY) === "1";
   } catch {
     // noop
   }
 
+  if (shouldRedirect) return <Navigate to="/" replace />;
   return <AdminsTab />;
 }
 

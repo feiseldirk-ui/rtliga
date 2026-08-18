@@ -5,6 +5,7 @@ import { clearVereinSession, readVereinSession } from "../../../lib/storage/vere
 import { stopGlobalAudio } from "../../../shared/media/audioPlayer";
 import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
+import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 
 import TeilnehmerPanel from "../../../shared/ui/dashboard/TeilnehmerPanel";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
@@ -77,6 +78,17 @@ function keyName(vorname, nachname) {
     .toLowerCase()}`;
 }
 
+function withTimeout(promise, timeoutMs = 15000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
+
 export default function VereinStart() {
   const navigate = useNavigate();
 
@@ -84,6 +96,7 @@ export default function VereinStart() {
   const [activeTab, setActiveTab] = useState("teilnehmer");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const unsavedChangesRef = useRef(false);
+  const teilnehmerRequestIdRef = useRef(0);
   const [pendingAction, setPendingAction] = useState(null);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [unsavedActionBusy, setUnsavedActionBusy] = useState(false);
@@ -94,7 +107,6 @@ export default function VereinStart() {
 
   const [teilnehmer, setTeilnehmer] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [contentReloadKey, setContentReloadKey] = useState(0);
 
   const [form, setForm] = useState({
     vorname: "",
@@ -123,10 +135,12 @@ export default function VereinStart() {
       }
 
       await fetchTeilnehmerMitErgebnisStatus(v);
-      setLoading(false);
     };
 
     init();
+    return () => {
+      teilnehmerRequestIdRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -189,13 +203,6 @@ export default function VereinStart() {
     setActiveTab(nextTab);
   };
 
-
-  useEffect(() => {
-    if (!verein) return;
-    setContentReloadKey((value) => value + 1);
-    window.dispatchEvent(new CustomEvent("rtliga-verein-tab-activated", { detail: { tab: activeTab } }));
-  }, [activeTab, verein]);
-
   const requestLogout = () => {
     if (unsavedChangesRef.current || hasUnsavedChanges) {
       setPendingAction({ type: "logout" });
@@ -244,57 +251,68 @@ export default function VereinStart() {
   };
 
   const fetchTeilnehmerMitErgebnisStatus = async (vereinObj) => {
+    const requestId = teilnehmerRequestIdRef.current + 1;
+    teilnehmerRequestIdRef.current = requestId;
     setLoading(true);
 
     const vereinId = vereinObj?.id;
     const vereinsname = vereinObj?.vereinsname;
 
     if (!vereinId || !vereinsname) {
-      setTeilnehmer([]);
-      setLoading(false);
+      if (requestId === teilnehmerRequestIdRef.current) {
+        setTeilnehmer([]);
+        setLoading(false);
+      }
       return;
     }
 
-    const { data: teiln, error: teilnErr } = await supabase
-      .from("verein_teilnehmer")
-      .select("id, vorname, name, altersklasse")
-      .eq("verein_id", vereinId);
+    try {
+      const session = await waitForSession(4000);
+      if (requestId !== teilnehmerRequestIdRef.current) return;
+      if (!session) throw new Error("session-timeout");
 
-    if (teilnErr) {
+      const activeSeason = getActiveSeason();
+      const [{ data: teiln, error: teilnErr }, { data: erg, error: ergErr }] = await withTimeout(
+        Promise.all([
+          seasonOrNullFilter(
+            supabase
+              .from("verein_teilnehmer")
+              .select("id, vorname, name, altersklasse")
+              .eq("verein_id", vereinId),
+            activeSeason,
+          ),
+          seasonOrNullFilter(
+            supabase
+              .from("verein_ergebnisse")
+              .select("vorname, nachname, verein")
+              .eq("verein", vereinsname),
+            activeSeason,
+          ),
+        ]),
+      );
+
+      if (requestId !== teilnehmerRequestIdRef.current) return;
+      if (teilnErr) throw teilnErr;
+
+      const teilnehmerListe = teiln || [];
+      if (ergErr) {
+        logError("Ergebnisstatus konnte nicht geladen werden.");
+        setTeilnehmer(teilnehmerListe.map((t) => ({ ...t, hatErgebnisse: false })));
+        return;
+      }
+
+      const ergSet = new Set((erg || []).map((r) => keyName(r.vorname, r.nachname)));
+      setTeilnehmer(teilnehmerListe.map((t) => ({
+        ...t,
+        hatErgebnisse: ergSet.has(keyName(t.vorname, t.name)),
+      })));
+    } catch {
+      if (requestId !== teilnehmerRequestIdRef.current) return;
       logError("Teilnehmer konnten nicht geladen werden.");
       setTeilnehmer([]);
-      setLoading(false);
-      return;
+    } finally {
+      if (requestId === teilnehmerRequestIdRef.current) setLoading(false);
     }
-
-    const teilnehmerListe = teiln || [];
-    if (teilnehmerListe.length === 0) {
-      setTeilnehmer([]);
-      setLoading(false);
-      return;
-    }
-
-    const { data: erg, error: ergErr } = await supabase
-      .from("verein_ergebnisse")
-      .select("vorname, nachname, verein")
-      .eq("verein", vereinsname);
-
-    if (ergErr) {
-      logError("Ergebnisstatus konnte nicht geladen werden.");
-      setTeilnehmer(teilnehmerListe.map((t) => ({ ...t, hatErgebnisse: false })));
-      setLoading(false);
-      return;
-    }
-
-    const ergSet = new Set((erg || []).map((r) => keyName(r.vorname, r.nachname)));
-
-    const mitStatus = teilnehmerListe.map((t) => ({
-      ...t,
-      hatErgebnisse: ergSet.has(keyName(t.vorname, t.name)),
-    }));
-
-    setTeilnehmer(mitStatus);
-    setLoading(false);
   };
 
   const stats = useMemo(() => {
@@ -527,7 +545,7 @@ export default function VereinStart() {
 
           {activeTab === "meine" && <VereinErgebnisseAnzeigen verein={verein} />}
 
-          {activeTab === "protokolle" && <VereinRundenprotokollTab key={`protokolle-${contentReloadKey}`} verein={verein} />}
+          {activeTab === "protokolle" && <VereinRundenprotokollTab verein={verein} />}
 
           {activeTab === "gesamt" && <GesamtergebnisseTab />}
         </div>

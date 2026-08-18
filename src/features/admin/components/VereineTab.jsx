@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { waitForSession } from "../../../lib/authReady";
 import supabase from "../../../lib/supabase/client";
 import { logError } from "../../../lib/logger";
@@ -19,6 +19,17 @@ const getStatusText = (count) => {
 
 const normalizeAgeClass = (value) => String(value || "").trim();
 
+function withTimeout(promise, timeoutMs = 15000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
+
 const VereineTab = ({ onRefreshStats }) => {
   const [vereine, setVereine] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,58 +38,73 @@ const VereineTab = ({ onRefreshStats }) => {
   const [teilnehmerCounts, setTeilnehmerCounts] = useState({});
   const [nameSortOrder, setNameSortOrder] = useState("asc");
   const [ageFilter, setAgeFilter] = useState("Alle");
+  const [loadError, setLoadError] = useState("");
+  const requestIdRef = useRef(0);
 
   const fetchVereine = React.useCallback(async () => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setLoading(true);
+    setLoadError("");
+
     try {
-      await waitForSession(4000);
+      const session = await waitForSession(4000);
+      if (requestId !== requestIdRef.current) return;
+      if (!session) throw new Error("session-timeout");
+
       const activeSeason = getActiveSeason();
-      const { data, error } = await supabase.from("vereine").select("*").order("vereinsname", { ascending: true });
-      if (error) {
-        logError("Vereine konnten nicht geladen werden.");
+      const { data, error } = await withTimeout(
+        supabase.from("vereine").select("*").order("vereinsname", { ascending: true }),
+      );
+      if (requestId !== requestIdRef.current) return;
+      if (error) throw error;
+
+      const vereinsListe = data || [];
+      setVereine(vereinsListe);
+
+      if (vereinsListe.length === 0) {
+        setTeilnehmerCounts({});
         return;
       }
 
-    const vereinsListe = data || [];
-    setVereine(vereinsListe);
+      const ids = vereinsListe.map((verein) => verein.id);
+      const counts = {};
+      const { data: teilnehmerData, error: teilnehmerError } = await withTimeout(
+        seasonOrNullFilter(
+          supabase
+            .from("verein_teilnehmer")
+            .select("id, verein_id")
+            .in("verein_id", ids),
+          activeSeason,
+        ),
+      );
+      if (requestId !== requestIdRef.current) return;
 
-    if (vereinsListe.length === 0) {
-      setTeilnehmerCounts({});
-      return;
-    }
+      if (teilnehmerError) throw teilnehmerError;
 
-    const ids = vereinsListe.map((verein) => verein.id);
-    const counts = {};
-    const { data: teilnehmerData, error: teilnehmerError } = await seasonOrNullFilter(
-      supabase
-        .from("verein_teilnehmer")
-        .select("id, verein_id")
-        .in("verein_id", ids),
-      activeSeason
-    );
-
-    if (teilnehmerError) {
-      logError("Teilnehmerzahlen konnten nicht geladen werden.");
-    } else {
       ids.forEach((id) => {
         counts[id] = 0;
       });
-
       (teilnehmerData || []).forEach((eintrag) => {
         counts[eintrag.verein_id] = (counts[eintrag.verein_id] || 0) + 1;
       });
 
       setTeilnehmerCounts(counts);
-    }
-
       if (typeof onRefreshStats === "function") onRefreshStats();
+    } catch {
+      if (requestId !== requestIdRef.current) return;
+      logError("Vereine konnten nicht geladen werden.");
+      setLoadError("Vereine konnten nicht geladen werden. Bitte den Bereich erneut öffnen.");
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [onRefreshStats]);
 
   useEffect(() => {
     fetchVereine();
+    return () => {
+      requestIdRef.current += 1;
+    };
   }, [fetchVereine]);
 
   useEffect(() => {
@@ -92,16 +118,24 @@ const VereineTab = ({ onRefreshStats }) => {
   }, [fetchVereine]);
 
   const loadTeilnehmer = async (vereinId) => {
+    const session = await waitForSession(4000);
+    if (!session) {
+      logError("Teilnehmer konnten nicht geladen werden.");
+      return [];
+    }
+
     const activeSeason = getActiveSeason();
-    const { data, error } = await seasonOrNullFilter(
-      supabase
-        .from("verein_teilnehmer")
-        .select("*")
-        .eq("verein_id", vereinId)
-        .order("name", { ascending: true })
-        .order("vorname", { ascending: true }),
-      activeSeason
-    );
+    const { data, error } = await withTimeout(
+      seasonOrNullFilter(
+        supabase
+          .from("verein_teilnehmer")
+          .select("*")
+          .eq("verein_id", vereinId)
+          .order("name", { ascending: true })
+          .order("vorname", { ascending: true }),
+        activeSeason,
+      ),
+    ).catch(() => ({ data: null, error: new Error("timeout") }));
 
     if (error) {
       logError("Teilnehmer konnten nicht geladen werden.");
@@ -129,7 +163,10 @@ const VereineTab = ({ onRefreshStats }) => {
   };
 
   const offenerVerein = vereine.find((verein) => verein.id === offenVereinId) || null;
-  const offeneTeilnehmer = teilnehmerMap[offenVereinId] || [];
+  const offeneTeilnehmer = useMemo(
+    () => teilnehmerMap[offenVereinId] || [],
+    [offenVereinId, teilnehmerMap],
+  );
 
   const ageOptions = useMemo(() => {
     const values = Array.from(new Set(offeneTeilnehmer.map((t) => normalizeAgeClass(t.altersklasse)).filter(Boolean)));
@@ -153,6 +190,10 @@ const VereineTab = ({ onRefreshStats }) => {
 
   if (loading && vereine.length === 0) {
     return <div className="rounded-3xl border border-zinc-200 bg-white px-5 py-10 text-center text-sm text-zinc-500 shadow-sm">Vereine werden geladen…</div>;
+  }
+
+  if (loadError && vereine.length === 0) {
+    return <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-10 text-center text-sm text-rose-700 shadow-sm">{loadError}</div>;
   }
 
   return (

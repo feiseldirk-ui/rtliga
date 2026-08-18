@@ -37,7 +37,13 @@ export function waitForSession(timeoutMs = 4000) {
     const settle = (session) => {
       if (settled) return;
       settled = true;
-      if (unsub) { try { unsub(); } catch {} }
+      if (unsub) {
+        try {
+          unsub();
+        } catch {
+          // Aufräumfehler dürfen das Session-Ergebnis nicht verändern.
+        }
+      }
       if (timer) clearTimeout(timer);
       resolve(session || null);
     };

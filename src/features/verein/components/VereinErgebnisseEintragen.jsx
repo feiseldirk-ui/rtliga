@@ -1,10 +1,22 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { loadSeasonSettings } from "../../../lib/seasonSettings";
+import { seasonOrNullFilter } from "../../../lib/seasonScope";
 
 const WK_ANZAHL = 9;
+
+function withTimeout(promise, timeoutMs = 15000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
 
 function formatDate(isoString) {
   if (!isoString) return "";
@@ -144,7 +156,7 @@ function serializeErgebnis(wkNummer, wk) {
   )}, SL=${Number(wk.sl || 0)}, Gesamt=${Number(wk.gesamt || 0)}, Status=${wk.status || ""}`;
 }
 
-export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChange, onRegisterUnsavedActions }) {
+export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeilnehmer, onDirtyChange, onRegisterUnsavedActions }) {
   const [teilnehmer, setTeilnehmer] = useState([]);
   const [zeitfenster, setZeitfenster] = useState([]);
   const [hinweis, setHinweis] = useState("");
@@ -154,6 +166,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
   const [wechselWarnung, setWechselWarnung] = useState(null);
   const [suche, setSuche] = useState("");
   const [savingIndex, setSavingIndex] = useState(null);
+  const [loadingData, setLoadingData] = useState(true);
   const [activeSeason, setActiveSeason] = useState(() => String(loadSeasonSettings().activeSeason || new Date().getFullYear()));
 
   const wechselWarnungRef = useRef(null);
@@ -167,8 +180,16 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
 
   useEffect(() => {
     if (!verein?.id) return;
-    fetchTeilnehmer();
-    fetchZeitfenster();
+    let active = true;
+    setLoadingData(true);
+
+    Promise.all([fetchTeilnehmer(), fetchZeitfenster()]).finally(() => {
+      if (active) setLoadingData(false);
+    });
+
+    return () => {
+      active = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verein?.id, activeSeason]);
 
@@ -242,24 +263,48 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
       });
       onDirtyChange?.(false);
     };
+    // Die registrierten Aktionen sollen immer den aktuell gerenderten Teilnehmerstand verwenden.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dirtyIndex, onRegisterUnsavedActions, onDirtyChange, activeSeason, verein?.id, teilnehmer]);
 
   const fetchTeilnehmer = async () => {
-    await waitForSession(4000);
+    const session = await waitForSession(4000);
+    if (!session) {
+      setHinweis("Teilnehmer konnten nicht geladen werden. Die Sitzung ist nicht verfügbar.");
+      return;
+    }
 
-    const { data: teilnehmerData, error: teilnehmerError } = await supabase
-      .from("verein_teilnehmer")
-      .select("*")
-      .eq("verein_id", verein.id)
-      .eq("saison", activeSeason)
-      .order("name", { ascending: true })
-      .order("vorname", { ascending: true });
+    let teilnehmerResult;
+    let ergebnisseResult;
+    try {
+      [teilnehmerResult, ergebnisseResult] = await withTimeout(
+        Promise.all([
+          seasonOrNullFilter(
+            supabase
+              .from("verein_teilnehmer")
+              .select("*")
+              .eq("verein_id", verein.id)
+              .order("name", { ascending: true })
+              .order("vorname", { ascending: true }),
+            Number(activeSeason),
+          ),
+          seasonOrNullFilter(
+            supabase
+              .from("verein_ergebnisse")
+              .select("*")
+              .eq("verein", verein.vereinsname),
+            Number(activeSeason),
+          ),
+        ]),
+      );
+    } catch {
+      logError("Teilnehmer und Ergebnisse konnten nicht geladen werden.");
+      setHinweis("Teilnehmer und Ergebnisse konnten nicht geladen werden. Bitte den Bereich erneut öffnen.");
+      return;
+    }
 
-    const { data: ergebnisseData, error: ergebnisseError } = await supabase
-      .from("verein_ergebnisse")
-      .select("*")
-      .eq("verein", verein.vereinsname)
-      .eq("saison", activeSeason);
+    const { data: teilnehmerData, error: teilnehmerError } = teilnehmerResult;
+    const { data: ergebnisseData, error: ergebnisseError } = ergebnisseResult;
 
     if (teilnehmerError) {
       logError("Teilnehmer konnten nicht geladen werden.");
@@ -295,12 +340,30 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
   };
 
   const fetchZeitfenster = async () => {
-    await waitForSession(4000);
-    const { data, error } = await supabase
-      .from("zeitfenster")
-      .select("*")
-      .eq("saison", activeSeason)
-      .order("wettkampf", { ascending: true });
+    const session = await waitForSession(4000);
+    if (!session) {
+      setHinweis("Zeitfenster konnten nicht geladen werden. Die Sitzung ist nicht verfügbar.");
+      return;
+    }
+
+    let result;
+    try {
+      result = await withTimeout(
+        seasonOrNullFilter(
+          supabase
+            .from("zeitfenster")
+            .select("*")
+            .order("wettkampf", { ascending: true }),
+          Number(activeSeason),
+        ),
+      );
+    } catch {
+      logError("Zeitfenster konnten nicht geladen werden.");
+      setHinweis("Zeitfenster konnten nicht geladen werden. Bitte den Bereich erneut öffnen.");
+      return;
+    }
+
+    const { data, error } = result;
 
     if (error) {
       logError("Zeitfenster konnten nicht geladen werden.");
@@ -310,7 +373,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
     setZeitfenster(data || []);
   };
 
-  const getWettkampfStatus = (wkIndex) => {
+  const getWettkampfStatus = useCallback((wkIndex) => {
     const z = zeitfenster.find((zf) => Number(zf.wettkampf) === wkIndex + 1);
 
     if (!z) {
@@ -345,7 +408,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
       offen: true,
       detail: `${formatDate(z.start)} – ${formatDate(z.ende)}`,
     };
-  };
+  }, [zeitfenster]);
 
   const toneClasses = (tone) => {
     if (tone === "emerald") return "border-emerald-200 bg-emerald-50 text-emerald-800";
@@ -379,12 +442,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
 
   const offeneWkCount = useMemo(
     () => Array.from({ length: WK_ANZAHL }, (_, i) => i).filter((i) => getWettkampfStatus(i).offen).length,
-    [zeitfenster]
-  );
-
-  const teilnehmerMitErgebnissenCount = useMemo(
-    () => teilnehmer.filter((t) => anyResultForTeilnehmer(t)).length,
-    [teilnehmer]
+    [getWettkampfStatus]
   );
 
   const toggleErgebnisse = (index) => {
@@ -475,6 +533,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
     setSavingIndex(null);
     setDirtyIndex(null);
     setSaveFeedback((current) => ({ ...current, [tidx]: { tone: "success", text: "Gespeichert" } }));
+    await refreshTeilnehmer?.();
     window.setTimeout(() => {
       setSaveFeedback((current) => ({ ...current, [tidx]: null }));
     }, 2200);
@@ -507,6 +566,10 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
     setSaveFeedback({});
     fetchTeilnehmer();
   };
+
+  if (loadingData) {
+    return <div className="rounded-3xl border border-zinc-200 bg-white px-5 py-10 text-center text-sm text-zinc-500 shadow-sm">Teilnehmer und Zeitfenster werden geladen…</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -556,6 +619,12 @@ export default function VereinErgebnisseEintragen({ onBack, verein, onDirtyChang
           <span className="font-semibold text-zinc-900">Hinweis:</span> Teilnehmerdaten bleiben
           gesperrt, sobald Ergebnisse vorhanden sind.
         </div>
+
+        {hinweis ? (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            {hinweis}
+          </div>
+        ) : null}
 
       </div>
 

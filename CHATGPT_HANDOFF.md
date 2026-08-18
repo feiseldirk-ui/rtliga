@@ -215,3 +215,26 @@ Das ist sauberer als alte und neue Logik weiter zu mischen.
 - Rundenprotokoll lädt jetzt zusätzlich bei expliziter Tab-Aktivierung (`rtliga-tab-activated`) in Admin- und Vereinsbereich neu.
 - PDF-Editor: Textfelder haben jetzt eine Ausrichtungswahl (Links / Mitte / Rechts). Vorschau rendert die Ausrichtung direkt.
 - Konnte den Build im Container diesmal nicht verifizieren, weil `npm`/`vite` lokal im Container keine nutzbare CLI bereitgestellt haben. Auf dem Nutzer-Rechner lief `npm run build` zuvor jedoch erfolgreich.
+
+## Update 2026-08-18 – Datenladen stabilisiert
+
+### Behobene Ursachen
+- Admin-Sitzung wird beim erneuten Öffnen wieder korrekt geprüft. Der fehlerhafte Aufruf einer nicht verfügbaren Session-Funktion wurde entfernt.
+- Supabase-Folgeabfragen aus `onAuthStateChange` laufen zeitversetzt und blockieren dadurch nicht mehr den Auth-Ablauf.
+- Die künstlichen Komponenten-Remounts und zusätzlichen Aktivierungsereignisse beim Tabwechsel wurden entfernt. Ein Tab startet beim Öffnen jetzt nur noch seinen normalen Ladevorgang.
+- Das Vereins-Rundenprotokoll startet keinen pauschalen zweiten Ladevorgang mehr. Ein Retry erfolgt nur noch nach einem echten Fehler.
+- Relevante Abfragen haben jetzt ein Zeitlimit, eine Kennung für die jeweils neueste Anfrage und eine saubere Behandlung beim Verlassen des Tabs. Veraltete Antworten können aktuelle Daten nicht mehr überschreiben.
+- Vereinsauswertungen, Rundenprotokolle und Teilnehmerstatus berücksichtigen die aktive Saison. Datensätze ohne Saison bleiben als Übergangsbestand sichtbar.
+- „Meine Ergebnisse“, Gesamtergebnisse, Rundenprotokolle, Vereinsliste und Adminliste zeigen bei Ladefehlern einen eindeutigen Zustand statt einer leeren oder dauerhaft ladenden Ansicht.
+- Nach dem Speichern eines Vereinsergebnisses wird der Teilnehmerstatus sofort neu geladen.
+- Beim Ergebniserfassen werden Teilnehmer, vorhandene Ergebnisse und Zeitfenster gemeinsam und mit sichtbarem Lade- beziehungsweise Fehlerzustand geladen.
+
+### Begleitende Bereinigung
+- Zeitfensterstatus aktualisiert sich minütlich ohne instabile Zeitberechnung während des Renderns.
+- ZIP-Export enthält jetzt Datum und Uhrzeit im Dateinamen und schließt weiterhin `node_modules`, `dist` und `.git` aus.
+- Keine Änderung an Supabase-Tabellen, Policies oder RPC-Funktionen.
+
+### Prüfung
+- `npm run lint` erfolgreich.
+- `npm run build` erfolgreich.
+- Bekannte Vite-Hinweise zu Chunkgröße und gemischtem Supabase-Import bleiben unverändert.

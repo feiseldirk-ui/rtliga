@@ -40,8 +40,10 @@ export function subscribeToTables({ tables = [], onChange, filter } = {}) {
 }
 
 export function useRealtimeRefresh({ tables = [], onChange, filter, enabled = true } = {}) {
+  const tablesKey = JSON.stringify(normalizeTables(tables));
+
   useEffect(() => {
     if (!enabled) return undefined;
-    return subscribeToTables({ tables, onChange, filter });
-  }, [enabled, filter, onChange, JSON.stringify(normalizeTables(tables))]);
+    return subscribeToTables({ tables: JSON.parse(tablesKey), onChange, filter });
+  }, [enabled, filter, onChange, tablesKey]);
 }

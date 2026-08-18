@@ -211,7 +211,9 @@ export async function saveSeasonSettingsToSupabase(nextSettings) {
     const supabase = await getSupabaseModule();
     const merged = { ...DEFAULT_SETTINGS, ...nextSettings };
     const season = resolveSeasonValue(merged);
-    const { leftLogo, rightLogo, ...settingsPayload } = merged;
+    const settingsPayload = { ...merged };
+    delete settingsPayload.leftLogo;
+    delete settingsPayload.rightLogo;
     const { data: userData } = await supabase.auth.getUser();
     const { error } = await supabase.from(SETTINGS_TABLE).upsert(
       {

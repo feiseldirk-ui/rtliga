@@ -6,7 +6,19 @@ import { subscribeToTables } from "../../../lib/realtime";
 import { exportRoundProtocolPdf } from "../../../lib/pdfExport";
 import { groupRoundProtocolDetailed } from "../../../lib/resultsProcessing";
 import { loadSeasonSettings } from "../../../lib/seasonSettings";
+import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 import { buildRoundTitle } from "../../../shared/pdf/editorLayout";
+
+function withTimeout(promise, timeoutMs = 15000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
 
 function isClosed(row) {
   return row?.ende && Date.parse(row.ende) < Date.now();
@@ -21,37 +33,63 @@ export default function VereinRundenprotokollTab({ verein }) {
   const [settings, setSettings] = useState(loadSeasonSettings());
   const requestIdRef = useRef(0);
   const loadAttemptRef = useRef(0);
+  const retryTimerRef = useRef(null);
 
   const load = useCallback(async ({ keepLoading = false } = {}) => {
-    if (!verein?.vereinsname) return;
+    if (!verein?.vereinsname) {
+      setEntries([]);
+      setWindows([]);
+      setLoading(false);
+      return;
+    }
+
+    window.clearTimeout(retryTimerRef.current);
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    await waitForSession(4000);
     if (!keepLoading) setLoading(true);
     setError("");
+    let retryScheduled = false;
+
     try {
-        const [{ data: entryData, error: entryError }, { data: windowData, error: windowError }] = await Promise.all([
-          supabase.from("verein_ergebnisse").select("*").eq("verein", verein.vereinsname),
-          supabase.from("zeitfenster").select("wettkampf, start, ende").order("wettkampf", { ascending: true }),
-        ]);
-        if (entryError) throw entryError;
-        if (windowError) throw windowError;
-        if (requestId !== requestIdRef.current) return;
-        setEntries(entryData || []);
-        setWindows(windowData || []);
-        loadAttemptRef.current = 0;
-    } catch {
+      const session = await waitForSession(4000);
       if (requestId !== requestIdRef.current) return;
-      logError("Rundenprotokolle konnten nicht geladen werden.");
+      if (!session) throw new Error("session-timeout");
+
+      const activeSeason = getActiveSeason();
+      const [{ data: entryData, error: entryError }, { data: windowData, error: windowError }] = await withTimeout(
+        Promise.all([
+          seasonOrNullFilter(
+            supabase.from("verein_ergebnisse").select("*").eq("verein", verein.vereinsname),
+            activeSeason,
+          ),
+          seasonOrNullFilter(
+            supabase.from("zeitfenster").select("wettkampf, start, ende").order("wettkampf", { ascending: true }),
+            activeSeason,
+          ),
+        ]),
+      );
+
+      if (requestId !== requestIdRef.current) return;
+      if (entryError) throw entryError;
+      if (windowError) throw windowError;
+
+      setEntries(entryData || []);
+      setWindows(windowData || []);
+      loadAttemptRef.current = 0;
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      logError("Rundenprotokolle konnten nicht geladen werden.", err);
       if (loadAttemptRef.current < 1) {
         loadAttemptRef.current += 1;
-        window.setTimeout(() => {
+        retryScheduled = true;
+        retryTimerRef.current = window.setTimeout(() => {
           load({ keepLoading: true });
         }, 800);
+      } else {
+        setError("Rundenprotokolle konnten nicht geladen werden. Bitte erneut öffnen.");
       }
-      setError("Rundenprotokolle konnten nicht geladen werden.");
     } finally {
-      if (requestId === requestIdRef.current) {
+      if (requestId === requestIdRef.current && !retryScheduled) {
         setLoading(false);
       }
     }
@@ -59,7 +97,6 @@ export default function VereinRundenprotokollTab({ verein }) {
 
   useEffect(() => {
     if (!verein?.vereinsname) return undefined;
-    let retryTimer;
     load();
 
     const handleVisibility = () => {
@@ -67,32 +104,17 @@ export default function VereinRundenprotokollTab({ verein }) {
     };
     const handlePageShow = () => load({ keepLoading: true });
     const handleSettingsUpdate = (event) => setSettings(event?.detail || loadSeasonSettings());
-    const handleAdminRefresh = () => load({ keepLoading: true });
-    const handleTabActivated = (event) => {
-      if (event?.detail?.tab === "protokolle") {
-        load();
-      }
-    };
-
-    retryTimer = window.setTimeout(() => {
-      load({ keepLoading: true });
-    }, 900);
 
     window.addEventListener("pageshow", handlePageShow);
-    window.addEventListener("focus", handlePageShow);
     window.addEventListener("rtliga-settings-updated", handleSettingsUpdate);
-    window.addEventListener("rtliga-admin-refresh", handleAdminRefresh);
-    window.addEventListener("rtliga-verein-tab-activated", handleTabActivated);
     document.addEventListener("visibilitychange", handleVisibility);
     const unsubscribe = subscribeToTables({ tables: ["verein_ergebnisse", "zeitfenster"], onChange: () => load({ keepLoading: true }) });
 
     return () => {
-      window.clearTimeout(retryTimer);
+      requestIdRef.current += 1;
+      window.clearTimeout(retryTimerRef.current);
       window.removeEventListener("pageshow", handlePageShow);
-      window.removeEventListener("focus", handlePageShow);
       window.removeEventListener("rtliga-settings-updated", handleSettingsUpdate);
-      window.removeEventListener("rtliga-admin-refresh", handleAdminRefresh);
-      window.removeEventListener("rtliga-verein-tab-activated", handleTabActivated);
       document.removeEventListener("visibilitychange", handleVisibility);
       unsubscribe?.();
     };
@@ -115,7 +137,7 @@ export default function VereinRundenprotokollTab({ verein }) {
       groupedResults: grouped,
       season: settings.activeSeason,
       roundNumber,
-      isAdmin: true,
+      isAdmin: false,
       fileName: `Ergebnisse_Runde${roundNumber}_${settings.activeSeason}_Verein.pdf`,
     });
   };

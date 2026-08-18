@@ -1,12 +1,24 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
+import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 
 const WK_ANZAHL = 9;
 const EMPTY_STATE_CLASS =
   "rounded-3xl border border-dashed border-zinc-300 bg-zinc-50 px-5 py-10 text-center text-sm text-zinc-500";
+
+function withTimeout(promise, timeoutMs = 15000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
 
 function parseNumber(text, key) {
   const match = String(text || "").match(new RegExp(`${key}=(\\d+)`, "i"));
@@ -34,70 +46,103 @@ function getGesamtBadgeClass(index) {
 
 export default function VereinErgebnisseAnzeigen({ verein }) {
   const [ergebnisse, setErgebnisse] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const requestIdRef = useRef(0);
+  const vereinId = verein?.id;
+  const vereinsname = verein?.vereinsname;
 
-  const fetchErgebnisse = React.useCallback(async () => {
-    if (!verein?.vereinsname) return;
-
-    await waitForSession(4000);
-
-    const { data, error } = await supabase
-      .from("verein_ergebnisse")
-      .select("*")
-      .eq("verein", verein.vereinsname)
-      .order("nachname", { ascending: true })
-      .order("vorname", { ascending: true })
-      .order("wettkampf", { ascending: true });
-
-    if (error) {
-      logError("Ergebnisse konnten nicht geladen werden.");
+  const fetchErgebnisse = useCallback(async ({ keepLoading = false } = {}) => {
+    if (!vereinId || !vereinsname) {
+      setErgebnisse([]);
+      setLoading(false);
       return;
     }
 
-    const gruppiert = {};
-    (data || []).forEach((eintrag) => {
-      const key = `${eintrag.vorname}|${eintrag.nachname}|${eintrag.altersklasse}`;
-      if (!gruppiert[key]) {
-        gruppiert[key] = {
-          vorname: eintrag.vorname,
-          nachname: eintrag.nachname,
-          altersklasse: eintrag.altersklasse,
-          punkte: Array(WK_ANZAHL).fill(0),
-        };
-      }
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    if (!keepLoading) setLoading(true);
+    setError("");
 
-      const wkIndex = Number(eintrag.wettkampf) - 1;
-      if (wkIndex >= 0 && wkIndex < WK_ANZAHL) {
-        gruppiert[key].punkte[wkIndex] = getWkGesamt(eintrag);
-      }
-    });
+    try {
+      const session = await waitForSession(4000);
+      if (requestId !== requestIdRef.current) return;
+      if (!session) throw new Error("session-timeout");
 
-    setErgebnisse(Object.values(gruppiert));
-  }, [verein?.vereinsname]);
+      const activeSeason = getActiveSeason();
+      const { data, error: loadError } = await withTimeout(
+        seasonOrNullFilter(
+          supabase
+            .from("verein_ergebnisse")
+            .select("*")
+            .eq("verein", vereinsname)
+            .order("nachname", { ascending: true })
+            .order("vorname", { ascending: true })
+            .order("wettkampf", { ascending: true }),
+          activeSeason,
+        ),
+      );
+
+      if (requestId !== requestIdRef.current) return;
+      if (loadError) throw loadError;
+
+      const gruppiert = {};
+      (data || []).forEach((eintrag) => {
+        const key = `${eintrag.vorname}|${eintrag.nachname}|${eintrag.altersklasse}`;
+        if (!gruppiert[key]) {
+          gruppiert[key] = {
+            vorname: eintrag.vorname,
+            nachname: eintrag.nachname,
+            altersklasse: eintrag.altersklasse,
+            punkte: Array(WK_ANZAHL).fill(0),
+          };
+        }
+
+        const wkIndex = Number(eintrag.wettkampf) - 1;
+        if (wkIndex >= 0 && wkIndex < WK_ANZAHL) {
+          gruppiert[key].punkte[wkIndex] = getWkGesamt(eintrag);
+        }
+      });
+
+      setErgebnisse(Object.values(gruppiert));
+    } catch {
+      if (requestId !== requestIdRef.current) return;
+      logError("Ergebnisse konnten nicht geladen werden.");
+      setError("Ergebnisse konnten nicht geladen werden. Bitte den Bereich erneut öffnen.");
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  }, [vereinId, vereinsname]);
 
   useEffect(() => {
-    if (!verein?.vereinsname) return undefined;
+    if (!vereinsname) return undefined;
 
     fetchErgebnisse();
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        fetchErgebnisse();
+        fetchErgebnisse({ keepLoading: true });
       }
     };
 
-    window.addEventListener("pageshow", fetchErgebnisse);
+    const handlePageShow = () => fetchErgebnisse({ keepLoading: true });
+    window.addEventListener("pageshow", handlePageShow);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      window.removeEventListener("pageshow", fetchErgebnisse);
+      requestIdRef.current += 1;
+      window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [fetchErgebnisse, verein?.vereinsname]);
+  }, [fetchErgebnisse, vereinsname]);
 
   useEffect(() => {
-    if (!verein?.vereinsname) return undefined;
-    return subscribeToTables({ tables: ["verein_ergebnisse"], onChange: fetchErgebnisse });
-  }, [fetchErgebnisse, verein?.vereinsname]);
+    if (!vereinsname) return undefined;
+    return subscribeToTables({
+      tables: ["verein_ergebnisse"],
+      onChange: () => fetchErgebnisse({ keepLoading: true }),
+    });
+  }, [fetchErgebnisse, vereinsname]);
 
   const berechneBeste6 = (punkte) => {
     const sortiert = [...punkte].sort((a, b) => b - a);
@@ -122,6 +167,14 @@ export default function VereinErgebnisseAnzeigen({ verein }) {
     () => ergebnisse.reduce((sum, eintrag) => sum + eintrag.punkte.filter((p) => p > 0).length, 0),
     [ergebnisse]
   );
+
+  if (loading) {
+    return <div className="rounded-3xl border border-zinc-200 bg-white px-5 py-10 text-center text-sm text-zinc-500 shadow-sm">Ergebnisse werden geladen…</div>;
+  }
+
+  if (error) {
+    return <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-10 text-center text-sm text-rose-700 shadow-sm">{error}</div>;
+  }
 
   return (
     <div className="space-y-6">

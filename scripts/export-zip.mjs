@@ -5,7 +5,19 @@ import { spawn } from 'node:child_process';
 
 const root = process.cwd();
 const projectName = path.basename(root);
-const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+const stampParts = new Intl.DateTimeFormat('de-DE', {
+  timeZone: 'Europe/Berlin',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+}).formatToParts(new Date()).reduce((result, part) => {
+  result[part.type] = part.value;
+  return result;
+}, {});
+const stamp = `${stampParts.year}${stampParts.month}${stampParts.day}_${stampParts.hour}${stampParts.minute}`;
 const outputZip = path.join(root, `${projectName}_${stamp}.zip`);
 const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'rtliga-export-'));
 const stageBase = path.join(tempRoot, 'stage');

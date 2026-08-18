@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { subscribeToTables } from "../../../lib/realtime";
 import {
@@ -8,6 +8,17 @@ import {
   normalizeAdminEmail,
   removeAdminByUserId,
 } from "../../../lib/admins";
+
+function withTimeout(promise, timeoutMs = 15000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
 
 function formatSyncTime(date) {
   if (!date) return "Noch keine Synchronisierung";
@@ -24,28 +35,38 @@ export default function AdminManagementTab() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [lastSync, setLastSync] = useState(null);
+  const requestIdRef = useRef(0);
 
   const loadAdmins = useCallback(async ({ keepLoading = false } = {}) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     if (!keepLoading) {
       setLoading(true);
     }
 
     try {
-      const [{ data: authData }, adminRows] = await Promise.all([supabase.auth.getUser(), fetchAdmins()]);
+      const [{ data: authData }, adminRows] = await withTimeout(
+        Promise.all([supabase.auth.getUser(), fetchAdmins()]),
+      );
+      if (requestId !== requestIdRef.current) return;
       setCurrentUserId(authData?.user?.id || "");
       setCurrentUserEmail(normalizeAdminEmail(authData?.user?.email));
       setAdmins(adminRows);
       setErrorMessage("");
       setLastSync(new Date());
     } catch (error) {
+      if (requestId !== requestIdRef.current) return;
       setErrorMessage(getFriendlyAdminError(error, "Adminliste konnte nicht geladen werden."));
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     loadAdmins();
+    return () => {
+      requestIdRef.current += 1;
+    };
   }, [loadAdmins]);
 
   useEffect(() => {
