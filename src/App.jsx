@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import VereinLogin from "./features/auth/components/VereinLogin";
 import VereinRegistrierung from "./features/auth/components/VereinRegistrierung";
@@ -7,6 +7,8 @@ import PasswortVergessen from "./features/auth/pages/PasswortVergessen";
 import PasswortZuruecksetzen from "./features/auth/pages/PasswortZuruecksetzen";
 import AdminsTab from "./features/admin/components/AdminsTab";
 import VereinStart from "./features/verein/components/VereinStart";
+import HomePage from "./features/public/components/HomePage";
+import PublicResultsPage from "./features/public/components/PublicResultsPage";
 import { logError } from "./lib/logger";
 import {
   clearVereinSession,
@@ -16,58 +18,6 @@ import {
 import supabase from "./lib/supabase/client";
 
 const ADMIN_LOGOUT_REDIRECT_KEY = "rtliga_admin_logout_redirect";
-const ADMIN_ACCESS_FLAG_KEY = "rtliga_admin_access_verified";
-
-function Auswahlseite() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    try {
-      window.sessionStorage.removeItem(ADMIN_LOGOUT_REDIRECT_KEY);
-      window.sessionStorage.removeItem(ADMIN_ACCESS_FLAG_KEY);
-    } catch {
-      // noop
-    }
-  }, []);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="card w-full max-w-md p-8 animate-fade-in">
-        <h1 className="mb-2 text-center text-2xl font-extrabold text-zinc-900">
-          RTLiga Verwaltung
-        </h1>
-
-        <p className="mb-6 text-center text-sm text-zinc-600">
-          Bitte wählen Sie Ihren Bereich.
-        </p>
-
-        <div className="flex flex-col gap-3">
-          <button
-            className="btn-action w-full"
-            onClick={() => navigate("/login")}
-          >
-            Vereinslogin
-          </button>
-
-          <button
-            className="btn-action w-full"
-            onClick={() => navigate("/registrieren")}
-          >
-            Verein registrieren
-          </button>
-
-          <button
-            className="btn-action w-full"
-            onClick={() => navigate("/admin")}
-          >
-            Adminbereich
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function AdminRoute() {
   let shouldRedirect = false;
 
@@ -166,7 +116,8 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Auswahlseite />} />
+      <Route path="/" element={<HomePage />} />
+      <Route path="/ergebnisse" element={<PublicResultsPage />} />
       <Route
         path="/login"
         element={<VereinLogin onLoginErfolg={handleLoginErfolg} />}

@@ -105,6 +105,27 @@ Das ist sauberer als alte und neue Logik weiter zu mischen.
 - möglichst nur minimale, nachvollziehbare Änderungen
 - keine riskanten Änderungen an Passwort-Reset/Login/Auth-Konfiguration ohne klaren Bedarf
 
+## Update 2026-08-30 – Öffentlicher Ergebnisbereich
+
+### Frontend
+- Neue responsive Startseite mit getrennten Bereichen für Vereine und öffentliche Ergebnisse.
+- Bestehende Registrierung bleibt vorläufig bestehen.
+- Neue Route `#/ergebnisse` mit Rundenansicht und Gesamtliste.
+- Runden- und Gesamtlisten können als PDF heruntergeladen werden.
+
+### Öffentliche Datenfreigabe
+- Neue vorbereitete Migration: `supabase/sql/015_public_closed_results_rpc.sql`.
+- Die Funktion `get_public_closed_results` gibt nur ausgewählte Ergebnisfelder aus gültigen, vollständig beendeten Runden zurück.
+- Basistabellen und bestehende RLS-Policies bleiben unverändert geschützt.
+- Migration wurde auf das Projekt `Onlineliga` angewendet.
+- Kontrolltest mit Datenbankrolle `anon`: öffentlich 5 Ergebniszeilen aus WK5/WK7, direkter Tabellenzugriff weiterhin 0 Zeilen.
+
+### Prüfung
+- 8/8 Tests erfolgreich.
+- Lint erfolgreich.
+- Produktions-Build erfolgreich.
+- SQL-Filter als reine Leseabfrage gegen die vorhandene Struktur geprüft.
+
 ## Update 2026-03-28 – Rundenprotokoll / PDF
 
 ### Durchgeführte Änderungen
