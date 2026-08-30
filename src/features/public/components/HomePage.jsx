@@ -80,7 +80,7 @@ export default function HomePage() {
         <header className="relative overflow-hidden border-b border-zinc-200 px-6 py-9 text-center sm:px-10 sm:py-12">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(59,130,246,0.12),transparent_30%),radial-gradient(circle_at_88%_20%,rgba(16,185,129,0.10),transparent_32%)]" />
           <div className="relative flex flex-col items-center">
-            <BrandMark className="h-[72px] w-[194px]" />
+            <BrandMark className="h-20 w-[190px]" />
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               RTLiga Verwaltung
             </h1>
@@ -109,21 +109,19 @@ export default function HomePage() {
             </div>
           </section>
 
-          <section className="rounded-[26px] border border-emerald-200 bg-gradient-to-br from-emerald-50/80 via-white to-white p-5 sm:p-7">
+          <section className="flex flex-col rounded-[26px] border border-emerald-200 bg-gradient-to-br from-emerald-50/80 via-white to-white p-5 sm:p-7">
             <div className="flex flex-col items-center text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                 <Icon name="chart" className="h-7 w-7" />
               </div>
               <h2 className="mt-4 text-2xl font-bold text-slate-900">Öffentliche Ergebnisse</h2>
               <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
-                Ranglisten und Ergebnisse geschlossener Runden – ohne Anmeldung.
+                Ranglisten und Ergebnisse geschlossener Runden – ohne Anmeldung. Runden und Gesamtliste werden dort ausgewählt.
               </p>
             </div>
 
-            <div className="mt-6 space-y-3">
+            <div className="mt-6 flex flex-1 items-center">
               <ActionButton icon="chart" tone="green" onClick={() => navigate("/ergebnisse")}>Ergebnisse abrufen</ActionButton>
-              <ActionButton icon="calendar" tone="green" onClick={() => navigate("/ergebnisse?ansicht=runden")}>Wettkampfrunden</ActionButton>
-              <ActionButton icon="trophy" tone="green" onClick={() => navigate("/ergebnisse?ansicht=gesamt")}>Aktuelle Gesamtliste</ActionButton>
             </div>
           </section>
         </div>

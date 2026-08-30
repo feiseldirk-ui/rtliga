@@ -3,25 +3,31 @@ import React from "react";
 export default function BrandMark({ className = "h-20 w-52" }) {
   return (
     <svg
-      viewBox="0 0 220 82"
+      viewBox="0 0 190 80"
       className={className}
       role="img"
       aria-label="RTLiga"
+      xmlns="http://www.w3.org/2000/svg"
     >
-      <defs>
-        <linearGradient id="rtliga-mark-gradient" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#2563eb" />
-          <stop offset="1" stopColor="#0f766e" />
-        </linearGradient>
-      </defs>
-      <path d="M18 22h92l-17 8H31z" fill="#38bdf8" />
-      <path d="M18 36h84l-17 8H31z" fill="#2563eb" />
-      <path d="M18 50h76l-17 8H31z" fill="#0f766e" />
-      <circle cx="135" cy="40" r="31" fill="white" stroke="url(#rtliga-mark-gradient)" strokeWidth="8" />
-      <circle cx="135" cy="40" r="17" fill="white" stroke="#1d4ed8" strokeWidth="7" />
-      <circle cx="135" cy="40" r="6" fill="#0f766e" />
-      <circle cx="178" cy="39" r="8" fill="white" stroke="#2563eb" strokeWidth="4" />
-      <circle cx="178" cy="39" r="2.5" fill="#0f766e" />
+      <g fill="#1769aa">
+        <path d="M2 14h126l7 7H18z" />
+        <path d="M2 27h123l5 7H28z" />
+        <path d="M2 46h128l-5 7H22z" />
+        <path d="M2 59h133l-7 7H14z" />
+      </g>
+      <g fill="#0b2845">
+        <circle cx="128" cy="40" r="28" />
+        <circle cx="128" cy="40" r="14" />
+        <circle cx="85" cy="40" r="6" />
+        <circle cx="171" cy="40" r="6" />
+      </g>
+      <g fill="#fff">
+        <circle cx="128" cy="40" r="20" />
+        <circle cx="128" cy="40" r="8" />
+        <circle cx="85" cy="40" r="3" />
+        <circle cx="171" cy="40" r="3" />
+      </g>
+      <circle cx="128" cy="40" r="3.5" fill="#1769aa" />
     </svg>
   );
 }
