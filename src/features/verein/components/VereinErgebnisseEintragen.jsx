@@ -4,8 +4,10 @@ import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { loadSeasonSettings } from "../../../lib/seasonSettings";
 import { seasonOrNullFilter } from "../../../lib/seasonScope";
+import { evaluateZeitfenster } from "../../../lib/wettkampfZeitfenster";
 
 const WK_ANZAHL = 9;
+const MINUTE_MS = 60 * 1000;
 
 function withTimeout(promise, timeoutMs = 15000) {
   let timeoutId;
@@ -168,6 +170,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
   const [savingIndex, setSavingIndex] = useState(null);
   const [loadingData, setLoadingData] = useState(true);
   const [activeSeason, setActiveSeason] = useState(() => String(loadSeasonSettings().activeSeason || new Date().getFullYear()));
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   const wechselWarnungRef = useRef(null);
   const wkRefs = useRef({});
@@ -176,6 +179,11 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
   useEffect(() => {
     const settings = loadSeasonSettings();
     setActiveSeason(String(settings.activeSeason || new Date().getFullYear()));
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), MINUTE_MS);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -375,16 +383,17 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
 
   const getWettkampfStatus = useCallback((wkIndex) => {
     const z = zeitfenster.find((zf) => Number(zf.wettkampf) === wkIndex + 1);
+    const status = evaluateZeitfenster(z, currentTime);
 
-    if (!z) {
+    if (status.code === "not_set") {
       return { label: "Kein Zeitfenster", tone: "zinc", offen: false, detail: "Kein Datum" };
     }
 
-    const now = new Date();
-    const start = z.start ? new Date(z.start) : null;
-    const end = z.ende ? new Date(z.ende) : null;
+    if (status.code === "invalid") {
+      return { label: "Ungültiges Zeitfenster", tone: "rose", offen: false, detail: "Bitte prüfen" };
+    }
 
-    if (start && now < start) {
+    if (status.code === "upcoming") {
       return {
         label: "Noch nicht geöffnet",
         tone: "sky",
@@ -393,7 +402,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
       };
     }
 
-    if (end && now > end) {
+    if (status.code === "closed") {
       return {
         label: "Geschlossen",
         tone: "rose",
@@ -408,7 +417,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
       offen: true,
       detail: `${formatDate(z.start)} – ${formatDate(z.ende)}`,
     };
-  }, [zeitfenster]);
+  }, [currentTime, zeitfenster]);
 
   const toneClasses = (tone) => {
     if (tone === "emerald") return "border-emerald-200 bg-emerald-50 text-emerald-800";
@@ -776,9 +785,11 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
                   </div>
 
                   <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3">
-                    {t.ergebnisse.map((wk, wkidx) => {
-                      const z = getWettkampfStatus(wkidx);
-                      const disabled = !z.offen;
+                    {t.ergebnisse
+                      .map((wk, wkidx) => ({ wk, wkidx, status: getWettkampfStatus(wkidx) }))
+                      .filter(({ status }) => status.offen)
+                      .map(({ wk, wkidx, status: z }) => {
+                      const disabled = false;
 
                       return (
                         <div
@@ -958,6 +969,12 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
                         </div>
                       );
                     })}
+                    {offeneWkCount === 0 ? (
+                      <div className="col-span-full rounded-3xl border border-dashed border-zinc-300 bg-zinc-50 px-5 py-8 text-center">
+                        <div className="text-base font-semibold text-zinc-800">Aktuell ist keine Wettkampfrunde zur Erfassung geöffnet.</div>
+                        <div className="mt-2 text-sm text-zinc-500">Die vollständigen Start- und Endzeiten findest du oben über „WK-Zeitfenster“.</div>
+                      </div>
+                    ) : null}
                   </div>
 
                 </div>
