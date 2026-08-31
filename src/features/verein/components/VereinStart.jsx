@@ -6,10 +6,10 @@ import { stopGlobalAudio } from "../../../shared/media/audioPlayer";
 import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
-import { evaluateZeitfenster } from "../../../lib/wettkampfZeitfenster";
 
 import TeilnehmerPanel from "../../../shared/ui/dashboard/TeilnehmerPanel";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
+import WkTimeWindowsModal from "../../../shared/ui/WkTimeWindowsModal";
 
 import VereinErgebnisseEintragen from "./VereinErgebnisseEintragen";
 import VereinErgebnisseAnzeigen from "./VereinErgebnisseAnzeigen";
@@ -74,81 +74,6 @@ function UnsavedChangesModal({ open, actionType, onSave, onDiscard, onCancel, bu
 }
 
 
-function ZeitfensterUebersichtModal({ open, onClose, zeitfenster, loading, error, currentTime }) {
-  if (!open) return null;
-
-  const formatDateTime = (value) => {
-    if (!value) return "–";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "–";
-    return date.toLocaleString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const getStatus = (item) => {
-    const status = evaluateZeitfenster(item, currentTime);
-    if (status.code === "not_set") return { label: "Nicht festgelegt", cls: "border-zinc-200 bg-zinc-50 text-zinc-600" };
-    if (status.code === "invalid") return { label: "Ungültig", cls: "border-rose-200 bg-rose-50 text-rose-700" };
-    if (status.code === "upcoming") return { label: "Bevorstehend", cls: "border-sky-200 bg-sky-50 text-sky-700" };
-    if (status.code === "closed") return { label: "Geschlossen", cls: "border-zinc-200 bg-zinc-50 text-zinc-600" };
-    return { label: "Offen", cls: "border-emerald-200 bg-emerald-50 text-emerald-700" };
-  };
-
-  return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-zinc-950/55 p-4 backdrop-blur-sm" onMouseDown={onClose}>
-      <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-[28px] border border-zinc-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.28)]" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-5 sm:px-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Wettkampfrunden</p>
-            <h3 className="mt-1 text-xl font-semibold text-zinc-950">WK-Zeitfenster</h3>
-            <p className="mt-1 text-sm text-zinc-600">Die vom Admin hinterlegten Start- und Endzeiten der Wettkampfrunden.</p>
-          </div>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-xl text-zinc-500 transition hover:bg-zinc-50" aria-label="Zeitfenster schließen">×</button>
-        </div>
-
-        <div className="max-h-[calc(88vh-104px)] overflow-y-auto p-5 sm:p-6">
-          {loading ? (
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500">Zeitfenster werden geladen…</div>
-          ) : error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 9 }, (_, index) => {
-                const wk = index + 1;
-                const item = zeitfenster.find((entry) => Number(entry.wettkampf) === wk);
-                const status = getStatus(item);
-                return (
-                  <div key={wk} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-base font-semibold text-zinc-900">WK{wk}</div>
-                      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${status.cls}`}>{status.label}</span>
-                    </div>
-                    <dl className="mt-4 space-y-3 text-sm">
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Beginn</dt>
-                        <dd className="mt-1 font-medium text-zinc-900">{formatDateTime(item?.start)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Ende</dt>
-                        <dd className="mt-1 font-medium text-zinc-900">{formatDateTime(item?.ende)}</dd>
-                      </div>
-                    </dl>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function keyName(vorname, nachname) {
   return `${(vorname || "").trim().toLowerCase()}|${(nachname || "")
     .trim()
@@ -189,6 +114,7 @@ export default function VereinStart() {
   const [zeitfensterLoading, setZeitfensterLoading] = useState(false);
   const [zeitfensterError, setZeitfensterError] = useState("");
   const [zeitfensterCurrentTime, setZeitfensterCurrentTime] = useState(() => Date.now());
+  const [zeitfensterSeason, setZeitfensterSeason] = useState(() => getActiveSeason());
 
   const [form, setForm] = useState({
     vorname: "",
@@ -273,6 +199,7 @@ export default function VereinStart() {
 
     try {
       const activeSeason = getActiveSeason();
+      setZeitfensterSeason(activeSeason);
       const { data, error } = await withTimeout(
         seasonOrNullFilter(
           supabase.from("zeitfenster").select("wettkampf,start,ende").order("wettkampf", { ascending: true }),
@@ -681,13 +608,14 @@ export default function VereinStart() {
         </div>
       </div>
 
-      <ZeitfensterUebersichtModal
+      <WkTimeWindowsModal
         open={zeitfensterOpen}
         onClose={() => setZeitfensterOpen(false)}
         zeitfenster={zeitfenster}
         loading={zeitfensterLoading}
         error={zeitfensterError}
         currentTime={zeitfensterCurrentTime}
+        season={zeitfensterSeason}
       />
 
       <UnsavedChangesModal

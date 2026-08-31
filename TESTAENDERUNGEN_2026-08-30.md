@@ -43,3 +43,22 @@ Nur lokaler Teststand. Keine Veröffentlichung, kein Deployment, keine Supabase-
 - `npm run build`: erfolgreich.
 - Die Migration `supabase/sql/015_public_closed_results_rpc.sql` wurde erfolgreich auf das Projekt `Onlineliga` angewendet.
 - Anonymer Kontrolltest nach der Migration: 5 freigegebene Ergebnisse aus WK5 und WK7; direkter anonymer Zugriff auf `verein_ergebnisse`: 0 Zeilen.
+
+## 4. Korrektur der Startseite
+- Provisorisch nachgebautes Zielscheibenlogo durch das originale Vektorlogo aus „Wettkampfauswertung Laufende Scheibe“ ersetzt.
+- Im öffentlichen Bereich nur noch ein Button „Ergebnisse abrufen“; Rundenansicht und Gesamtliste werden anschließend auf der Ergebnisseite gewählt.
+
+## 5. Öffentliche WK-Termine und Kalenderexport – 31.08.2026
+- Auf der Startseite ergänzt der Button „WK-Zeitfenster“ den öffentlichen Ergebnisbereich.
+- Öffentliche Besucher sehen dieselbe übersichtliche Terminansicht für WK1 bis WK9 wie angemeldete Vereine.
+- Die öffentliche Datenbankfunktion liefert nur Saison, WK-Nummer, Beginn und Ende. Vereins-, Teilnehmer- und Ergebnisdaten werden dadurch nicht zusätzlich freigegeben.
+- Die gemeinsame Zeitfensteransicht bietet „Kalenderdatei herunterladen“ im öffentlichen und im Vereinsbereich.
+- Die `.ics`-Datei enthält je gültigem Zeitfenster einen Termin und lässt sich in Outlook, Google Kalender und Smartphone-Kalender importieren.
+- Nicht festgelegte und ungültige Zeitfenster werden nicht in die Kalenderdatei übernommen.
+- Neue SQL-Datei: `supabase/sql/016_public_wk_time_windows_rpc.sql`.
+
+### Prüfung
+- `npm test`: 12/12 Tests erfolgreich.
+- `npm run lint`: erfolgreich.
+- `npm run build`: erfolgreich.
+- Bekannte Vite-Hinweise zu Chunkgröße und gemischtem Supabase-Import bleiben unverändert.

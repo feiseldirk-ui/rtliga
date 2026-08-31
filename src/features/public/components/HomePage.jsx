@@ -1,9 +1,20 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { logError } from "../../../lib/logger";
+import supabase from "../../../lib/supabase/client";
 import BrandMark from "../../../shared/ui/BrandMark";
+import WkTimeWindowsModal from "../../../shared/ui/WkTimeWindowsModal";
 
 const ADMIN_LOGOUT_REDIRECT_KEY = "rtliga_admin_logout_redirect";
 const ADMIN_ACCESS_FLAG_KEY = "rtliga_admin_access_verified";
+
+function withTimeout(promise, timeoutMs = 15000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
 
 function Icon({ name, className = "h-5 w-5" }) {
   const common = {
@@ -64,6 +75,13 @@ function ActionButton({ icon, children, tone = "blue", onClick, primary = false 
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const [zeitfensterOpen, setZeitfensterOpen] = useState(false);
+  const [zeitfenster, setZeitfenster] = useState([]);
+  const [zeitfensterLoading, setZeitfensterLoading] = useState(false);
+  const [zeitfensterError, setZeitfensterError] = useState("");
+  const [zeitfensterCurrentTime, setZeitfensterCurrentTime] = useState(() => Date.now());
+  const zeitfensterRequestIdRef = useRef(0);
+  const requestedSeason = new Date().getFullYear();
 
   useEffect(() => {
     try {
@@ -73,6 +91,40 @@ export default function HomePage() {
       // noop
     }
   }, []);
+
+  useEffect(() => {
+    if (!zeitfensterOpen) return undefined;
+    const timer = window.setInterval(() => setZeitfensterCurrentTime(Date.now()), 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, [zeitfensterOpen]);
+
+  useEffect(() => () => {
+    zeitfensterRequestIdRef.current += 1;
+  }, []);
+
+  const openZeitfenster = async () => {
+    const requestId = zeitfensterRequestIdRef.current + 1;
+    zeitfensterRequestIdRef.current = requestId;
+    setZeitfensterCurrentTime(Date.now());
+    setZeitfensterOpen(true);
+    setZeitfensterLoading(true);
+    setZeitfensterError("");
+
+    try {
+      const { data, error } = await withTimeout(
+        supabase.rpc("get_public_wk_time_windows", { p_saison: requestedSeason }),
+      );
+      if (requestId !== zeitfensterRequestIdRef.current) return;
+      if (error) throw error;
+      setZeitfenster(data || []);
+    } catch (error) {
+      if (requestId !== zeitfensterRequestIdRef.current) return;
+      logError(`Öffentliche WK-Zeitfenster konnten nicht geladen werden: ${error?.message || "unbekannter Fehler"}`);
+      setZeitfensterError("Die WK-Zeitfenster konnten nicht geladen werden. Bitte später erneut versuchen.");
+    } finally {
+      if (requestId === zeitfensterRequestIdRef.current) setZeitfensterLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen px-4 py-8 sm:px-6 sm:py-12">
@@ -121,7 +173,10 @@ export default function HomePage() {
             </div>
 
             <div className="mt-6 flex flex-1 items-center">
-              <ActionButton icon="chart" tone="green" onClick={() => navigate("/ergebnisse")}>Ergebnisse abrufen</ActionButton>
+              <div className="w-full space-y-3">
+                <ActionButton icon="chart" tone="green" onClick={() => navigate("/ergebnisse")}>Ergebnisse abrufen</ActionButton>
+                <ActionButton icon="calendar" tone="green" onClick={openZeitfenster}>WK-Zeitfenster</ActionButton>
+              </div>
             </div>
           </section>
         </div>
@@ -138,6 +193,16 @@ export default function HomePage() {
           </div>
         </footer>
       </div>
+
+      <WkTimeWindowsModal
+        open={zeitfensterOpen}
+        onClose={() => setZeitfensterOpen(false)}
+        zeitfenster={zeitfenster}
+        loading={zeitfensterLoading}
+        error={zeitfensterError}
+        currentTime={zeitfensterCurrentTime}
+        season={requestedSeason}
+      />
     </main>
   );
 }

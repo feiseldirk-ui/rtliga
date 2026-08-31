@@ -126,6 +126,10 @@ Das ist sauberer als alte und neue Logik weiter zu mischen.
 - Produktions-Build erfolgreich.
 - SQL-Filter als reine Leseabfrage gegen die vorhandene Struktur geprüft.
 
+### Startseitenkorrektur
+- Das BrandMark ist jetzt eine direkte Übernahme des originalen Vektorlogos aus `/workspace/sites/laufende-scheibe/app/brand-mark.tsx`.
+- Auf der Startseite bleibt unter „Öffentliche Ergebnisse“ nur „Ergebnisse abrufen“; die Umschaltung erfolgt innerhalb von `#/ergebnisse`.
+
 ## Update 2026-03-28 – Rundenprotokoll / PDF
 
 ### Durchgeführte Änderungen
@@ -259,3 +263,25 @@ Das ist sauberer als alte und neue Logik weiter zu mischen.
 - `npm run lint` erfolgreich.
 - `npm run build` erfolgreich.
 - Bekannte Vite-Hinweise zu Chunkgröße und gemischtem Supabase-Import bleiben unverändert.
+
+## Update 2026-08-31 – WK-Termine und Kalenderexport
+
+### Umsetzung
+- Die öffentliche Startseite hat im Bereich „Öffentliche Ergebnisse“ zusätzlich den Button „WK-Zeitfenster“.
+- Öffentliche Besucher und Vereine verwenden dieselbe Zeitfensterübersicht für WK1 bis WK9.
+- In beiden Ansichten steht „Kalenderdatei herunterladen“ zur Verfügung.
+- Der Export erzeugt eine `.ics`-Datei mit je einem Termin pro gültigem WK-Zeitfenster; ungültige oder nicht gesetzte Zeitfenster werden ausgelassen.
+- Die öffentliche Terminabfrage ist als schmale Read-only-Schnittstelle ausgeführt und gibt ausschließlich Saison, WK-Nummer, Beginn und Ende zurück.
+
+### Relevante Dateien
+- `src/shared/ui/WkTimeWindowsModal.jsx`
+- `src/lib/wkCalendarExport.js`
+- `src/features/public/components/HomePage.jsx`
+- `src/features/verein/components/VereinStart.jsx`
+- `supabase/sql/016_public_wk_time_windows_rpc.sql`
+- `tests/wkCalendarExport.test.mjs`
+
+### Prüfung
+- `npm test`: 12/12 erfolgreich.
+- `npm run lint`: erfolgreich.
+- `npm run build`: erfolgreich.
