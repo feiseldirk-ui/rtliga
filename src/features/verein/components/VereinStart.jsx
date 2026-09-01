@@ -6,6 +6,8 @@ import { stopGlobalAudio } from "../../../shared/media/audioPlayer";
 import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
+import { clubSessionApi, notifyClubSessionFailure } from "../../../lib/vereinSessionLock";
+import { endClubSession } from "../../../lib/clubSessionCore";
 
 import TeilnehmerPanel from "../../../shared/ui/dashboard/TeilnehmerPanel";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
@@ -109,6 +111,7 @@ export default function VereinStart() {
 
   const [teilnehmer, setTeilnehmer] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sessionNotice, setSessionNotice] = useState("");
   const [zeitfensterOpen, setZeitfensterOpen] = useState(false);
   const [zeitfenster, setZeitfenster] = useState([]);
   const [zeitfensterLoading, setZeitfensterLoading] = useState(false);
@@ -227,13 +230,15 @@ export default function VereinStart() {
     if (action.type === "logout") {
       try {
         stopGlobalAudio();
-        await supabase.auth.signOut({ scope: "local" });
-      } finally {
+        window.dispatchEvent(new Event("rtliga-club-session-ended"));
+        await endClubSession(supabase, clubSessionApi, verein.id, readVereinSession()?.identity);
         clearVereinSession();
         navigate("/", { replace: true });
         window.setTimeout(() => {
           window.location.assign(import.meta.env.BASE_URL || "/");
         }, 20);
+      } catch {
+        setSessionNotice("Abmelden konnte nicht bestätigt werden. Bitte Verbindung prüfen und erneut auf Verlassen klicken.");
       }
     }
   };
@@ -384,6 +389,7 @@ export default function VereinStart() {
     const altersklasse = form.altersklasse?.trim();
 
     if (!vorname || !name || !altersklasse) return;
+    setSessionNotice("");
 
     const { error } = await supabase.from("verein_teilnehmer").insert({
       vorname,
@@ -393,6 +399,8 @@ export default function VereinStart() {
     });
 
     if (error) {
+      notifyClubSessionFailure(error);
+      setSessionNotice("Teilnehmer wurde nicht gespeichert. Bitte Verbindung und Vereinssitzung prüfen.");
       logError("Teilnehmer konnte nicht hinzugefügt werden.");
       return;
     }
@@ -412,6 +420,7 @@ export default function VereinStart() {
 
   const onUpdate = async () => {
     if (!verein || !bearbeiteId) return;
+    setSessionNotice("");
 
     const { error } = await supabase
       .from("verein_teilnehmer")
@@ -420,9 +429,13 @@ export default function VereinStart() {
         name: form.name.trim(),
         altersklasse: form.altersklasse,
       })
-      .eq("id", bearbeiteId);
+      .eq("id", bearbeiteId)
+      .select("id")
+      .single();
 
     if (error) {
+      notifyClubSessionFailure(error);
+      setSessionNotice("Änderung wurde nicht bestätigt. Bitte Verbindung und Vereinssitzung prüfen.");
       logError("Teilnehmer konnte nicht aktualisiert werden.");
       return;
     }
@@ -442,13 +455,18 @@ export default function VereinStart() {
 
     const bestaetigt = window.confirm("Teilnehmer wirklich löschen?");
     if (!bestaetigt) return;
+    setSessionNotice("");
 
     const { error } = await supabase
       .from("verein_teilnehmer")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .select("id")
+      .single();
 
     if (error) {
+      notifyClubSessionFailure(error);
+      setSessionNotice("Entfernen wurde nicht bestätigt. Bitte Verbindung und Vereinssitzung prüfen.");
       logError("Teilnehmer konnte nicht gelöscht werden.");
       return;
     }
@@ -470,6 +488,7 @@ export default function VereinStart() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
+      {sessionNotice && <div role="alert" className="m-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{sessionNotice}</div>}
 
       {/* ── Sticky Header ─────────────────────────────────────────── */}
       <div className="sticky top-0 z-40 bg-white border-b border-zinc-200 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">

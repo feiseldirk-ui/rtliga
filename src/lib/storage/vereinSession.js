@@ -9,6 +9,7 @@ export function readVereinSession() {
     return {
       id: parsed.id,
       vereinsname: parsed.vereinsname,
+      identity: typeof parsed.identity === "string" ? parsed.identity : null,
     };
   } catch {
     clearVereinSession();
@@ -23,6 +24,7 @@ export function writeVereinSession(verein) {
     JSON.stringify({
       id: verein.id,
       vereinsname: verein.vereinsname,
+      identity: verein.identity || null,
     })
   );
 }

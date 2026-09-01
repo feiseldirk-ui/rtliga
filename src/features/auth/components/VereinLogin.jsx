@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import supabase from "../../../lib/supabase/client";
 import { logError } from "../../../lib/logger";
 import { writeVereinSession } from "../../../lib/storage/vereinSession";
+import { loginClub } from "../../../lib/vereinSessionLock";
 
 export default function VereinLogin({ onLoginErfolg }) {
   const navigate = useNavigate();
@@ -29,39 +29,14 @@ export default function VereinLogin({ onLoginErfolg }) {
     try {
       const mail = email.trim().toLowerCase();
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: mail,
-        password: passwort,
-      });
-
-      if (error || !data?.user) {
-        setFehler("Login fehlgeschlagen. Bitte prüfen Sie Ihre Zugangsdaten.");
-        return;
-      }
-
-      const { data: verein, error: vereinError } = await supabase
-        .from("vereine")
-        .select("id, vereinsname")
-        .eq("user_id", data.user.id)
-        .maybeSingle();
-
-      if (vereinError || !verein) {
-        await supabase.auth.signOut();
-        setFehler("Für dieses Konto wurde kein Verein gefunden.");
-        return;
-      }
-
-      const safeVerein = {
-        id: verein.id,
-        vereinsname: verein.vereinsname,
-      };
+      const safeVerein = await loginClub(mail, passwort);
 
       writeVereinSession(safeVerein);
       onLoginErfolg?.(safeVerein);
       navigate("/verein");
-    } catch {
+    } catch (error) {
       logError("Login-Vorgang fehlgeschlagen.");
-      setFehler("Beim Login ist ein Fehler aufgetreten.");
+      setFehler(error.message || "Beim Login ist ein Fehler aufgetreten.");
     } finally {
       setLoading(false);
     }
@@ -138,7 +113,7 @@ export default function VereinLogin({ onLoginErfolg }) {
           </div>
 
           {fehler ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {fehler}
             </div>
           ) : null}

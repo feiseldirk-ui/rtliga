@@ -5,6 +5,7 @@ import { logError } from "../../../lib/logger";
 import { loadSeasonSettings } from "../../../lib/seasonSettings";
 import { seasonOrNullFilter } from "../../../lib/seasonScope";
 import { evaluateZeitfenster } from "../../../lib/wettkampfZeitfenster";
+import { notifyClubSessionFailure } from "../../../lib/vereinSessionLock";
 
 const WK_ANZAHL = 9;
 const MINUTE_MS = 60 * 1000;
@@ -526,6 +527,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
       });
 
       if (error) {
+        notifyClubSessionFailure(error);
         logError(`Ergebnisse konnten nicht gespeichert werden: ${error.message || "unbekannter Fehler"}`);
         setSaveFeedback((current) => ({
           ...current,

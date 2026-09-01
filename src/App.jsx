@@ -7,6 +7,7 @@ import PasswortVergessen from "./features/auth/pages/PasswortVergessen";
 import PasswortZuruecksetzen from "./features/auth/pages/PasswortZuruecksetzen";
 import AdminsTab from "./features/admin/components/AdminsTab";
 import VereinStart from "./features/verein/components/VereinStart";
+import VereinSessionGate from "./features/auth/components/VereinSessionGate";
 import HomePage from "./features/public/components/HomePage";
 import PublicResultsPage from "./features/public/components/PublicResultsPage";
 import { logError } from "./lib/logger";
@@ -96,6 +97,7 @@ export default function App() {
     const safeVerein = {
       id: vereinObj.id,
       vereinsname: vereinObj.vereinsname,
+      identity: vereinObj.identity || null,
     };
 
     setVerein(safeVerein);
@@ -129,7 +131,9 @@ export default function App() {
         path="/verein"
         element={
           verein ? (
-            <VereinStart verein={verein} />
+            <VereinSessionGate key={verein.id} verein={verein}>
+              <VereinStart verein={verein} />
+            </VereinSessionGate>
           ) : (
             <Navigate to="/login" replace />
           )
