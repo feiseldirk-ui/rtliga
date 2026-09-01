@@ -1,330 +1,161 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
-import { waitForSession } from "../../../lib/authReady";
-import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
-import { getActiveSeason, seasonOrNullFilter, withSeasonPayload } from "../../../lib/seasonScope";
+import { getActiveSeason } from "../../../lib/seasonScope";
+import { evaluateZeitfenster } from "../../../lib/wettkampfZeitfenster";
+import { initialWindowState, toLocalInput, validateWindow, windowReducer, windowSnapshot } from "../../../lib/timeWindowAdmin";
 
-const BASIS_ZEITFENSTER = Array.from({ length: 9 }, (_, i) => ({ id: i + 1, wettkampf: i + 1, start: "", ende: "" }));
-const MINUTE_MS = 60 * 1000;
+const formatDate = value => value ? new Date(value).toLocaleString("de-DE", {
+  day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+}) : "–";
 
-function toDateTimeLocalValue(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
+async function request(query) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 15000);
+  try {
+    const { data, error } = await query.abortSignal(controller.signal);
+    if (error) throw error;
+    return data;
+  } finally { window.clearTimeout(timer); }
 }
-
-function fromDateAndTime(dateValue, timeValue) {
-  if (!dateValue || !timeValue) return "";
-  return `${dateValue}T${timeValue}`;
-}
-
-function splitDateTimeValue(value) {
-  const localValue = toDateTimeLocalValue(value);
-  if (!localValue) return { date: "", time: "" };
-  const [date, time] = localValue.split("T");
-  return { date: date || "", time: (time || "").slice(0, 5) };
-}
-
-function parseTimestamp(value) {
-  if (!value) return null;
-  const ts = new Date(value).getTime();
-  return Number.isFinite(ts) ? ts : null;
-}
-
-function sortFenster(list) {
-  return [...list].sort((a, b) => a.wettkampf - b.wettkampf);
-}
-
-function validateFenster(fenster, basisListe) {
-  if (!fenster.start || !fenster.ende) return { ok: true };
-  const start = parseTimestamp(fenster.start);
-  const ende = parseTimestamp(fenster.ende);
-
-  if (start === null || ende === null) {
-    return { ok: false, message: "❌ Ungültiges Datum oder ungültige Uhrzeit." };
-  }
-
-  if (start >= ende) {
-    return { ok: false, message: "❌ Das Enddatum muss nach dem Startdatum liegen." };
-  }
-
-  const overlappingItems = basisListe.filter((item) => {
-    if (item.wettkampf === fenster.wettkampf || !item.start || !item.ende) return false;
-    const otherStart = parseTimestamp(item.start);
-    const otherEnd = parseTimestamp(item.ende);
-    if (otherStart == null || otherEnd == null) return false;
-    return start < otherEnd && ende > otherStart;
-  });
-
-  if (overlappingItems.length) {
-    const names = overlappingItems.map((item) => `WK${item.wettkampf}`).join(", ");
-    return { ok: false, message: `❌ WK${fenster.wettkampf} überschneidet sich mit ${names}.` };
-  }
-
-  return { ok: true };
-}
-
-function DateTimeEditor({ label, value, editorKey, openEditorKey, onToggle, onApply }) {
-  const [localError, setLocalError] = useState("");
-  const initial = useMemo(() => splitDateTimeValue(value), [value]);
-  const open = openEditorKey === editorKey;
-  const [draftDate, setDraftDate] = useState(initial.date);
-  const [draftTime, setDraftTime] = useState(initial.time || "16:00");
-
-  const handleToggle = () => {
-    if (!open) {
-      setDraftDate(initial.date);
-      setDraftTime(initial.time || "16:00");
-      setLocalError("");
-    }
-    onToggle(open ? null : editorKey);
-  };
-
-  return (
-    <div className="relative min-w-[220px] overflow-visible">
-      <button type="button" className="input flex min-h-[46px] items-center justify-between gap-3 text-left" onClick={handleToggle}>
-        <span className={value ? "text-zinc-900" : "text-zinc-400"}>{value ? new Date(value).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : label}</span>
-        <span aria-hidden="true">🗓️</span>
-      </button>
-
-      {open ? (
-        <div className="absolute left-0 top-full z-40 mt-2 w-[396px] max-w-[min(396px,calc(100vw-1rem))] rounded-3xl border border-zinc-200 bg-white p-4 shadow-[0_18px_36px_rgba(16,24,40,0.12)]">
-          <div className="space-y-3">
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Tag</label>
-              <input type="date" value={draftDate} onChange={(event) => { setDraftDate(event.target.value); setLocalError(""); }} className="input" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Uhrzeit</label>
-              <input type="time" value={draftTime} onChange={(event) => { setDraftTime(event.target.value); setLocalError(""); }} className="input" step="60" />
-            </div>
-            {localError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{localError}</div> : null}
-            <div className="grid grid-cols-3 gap-2 pt-1">
-              <button type="button" className="btn-mini min-w-0 flex-1 whitespace-nowrap" onClick={() => { setDraftDate(""); setDraftTime("16:00"); }}>Zurücksetzen</button>
-              <button type="button" className="btn-mini min-w-0 flex-1 whitespace-nowrap" onClick={() => onToggle(null)}>Abbrechen</button>
-              <button
-                type="button"
-                className="btn-mini min-w-0 w-full whitespace-nowrap border-indigo-200 bg-indigo-600 text-white hover:bg-indigo-500"
-                onClick={() => {
-                  const result = onApply(fromDateAndTime(draftDate, draftTime));
-                  if (result?.ok) {
-                    setLocalError("");
-                    onToggle(null);
-                  } else if (result?.message) {
-                    setLocalError(result.message);
-                  }
-                }}
-              >
-                Übernehmen
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
+function friendlyError(error) {
+  if (error?.code === "55P03") return "Ein anderer Speichervorgang läuft noch. Bitte kurz warten und den gespeicherten Stand neu laden. Dein Entwurf bleibt erhalten.";
+  if (error?.code === "23P01") return "Überschneidung: Ein anderer WK ist in diesem Zeitraum bereits geöffnet. Bitte gespeicherten Stand laden und Zeiten anpassen.";
+  if (error?.code === "PGRST202") return "Die neue Zeitfenster-Funktion ist in Supabase noch nicht eingerichtet. Bitte zuerst das zugehörige SQL installieren.";
+  if (error?.code === "42501") return "Keine Adminberechtigung oder Anmeldung abgelaufen. Bitte erneut anmelden.";
+  if (/abort|fetch|network|timeout/i.test(error?.message || "")) return "Keine Speicherbestätigung erhalten. Bitte den gespeicherten Stand neu laden und prüfen, bevor du erneut speicherst.";
+  return error?.message || "Speichern konnte nicht bestätigt werden. Dein Entwurf bleibt erhalten.";
 }
 
 export default function ZeitfensterTab({ onRefreshStats }) {
-  const [zeitfenster, setZeitfenster] = useState(BASIS_ZEITFENSTER);
-  const [originalZeitfenster, setOriginalZeitfenster] = useState(BASIS_ZEITFENSTER);
-  const [hinweis, setHinweis] = useState("");
-  const [gespeichert, setGespeichert] = useState(null);
-  const [savingWettkampf, setSavingWettkampf] = useState(null);
-  const [openEditorKey, setOpenEditorKey] = useState(null);
-  const [currentTime, setCurrentTime] = useState(() => Date.now());
-
+  const [state, dispatch] = useReducer(windowReducer, initialWindowState);
+  const [season] = useState(() => getActiveSeason());
+  const [now, setNow] = useState(() => Date.now());
+  const requestId = useRef(0);
+  const busy = useRef(false);
+  const mounted = useRef(true);
+  const statsCallback = useRef(onRefreshStats);
+  useEffect(() => { statsCallback.current = onRefreshStats; }, [onRefreshStats]);
+  const load = useCallback(async () => {
+    if (busy.current) return;
+    const id = ++requestId.current;
+    dispatch({ type: "load" });
+    try {
+      const rows = await request(supabase.from("zeitfenster").select("id,wettkampf,start,ende,saison").eq("saison", String(season)).order("wettkampf"));
+      if (mounted.current && id === requestId.current) dispatch({ type: "loaded", rows: rows || [] });
+    } catch {
+      if (mounted.current && id === requestId.current) dispatch({ type: "load-error", message: "Zeitfenster konnten nicht geladen werden. Vorhandene Werte und Entwürfe bleiben erhalten. Bitte erneut laden." });
+    }
+  }, [season]);
   useEffect(() => {
-    const timer = window.setInterval(() => setCurrentTime(Date.now()), MINUTE_MS);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const fetchZeitfenster = React.useCallback(async () => {
-    await waitForSession(4000);
-    const activeSeason = getActiveSeason();
-    const { data, error } = await seasonOrNullFilter(supabase.from("zeitfenster").select("*").order("wettkampf", { ascending: true }), activeSeason);
-
-    const kombiniert = BASIS_ZEITFENSTER.map((wk) => {
-      const dbWert = data?.find((d) => d.wettkampf === wk.wettkampf);
-      return dbWert ? { ...wk, ...dbWert } : wk;
-    });
-
-    if (error) logError("Daten konnten nicht geladen werden.");
-    setZeitfenster(sortFenster(kombiniert));
-    setOriginalZeitfenster(sortFenster(kombiniert));
-    if (typeof onRefreshStats === "function") onRefreshStats();
-  }, [onRefreshStats]);
-
-  useEffect(() => {
-    const initialLoadTimer = window.setTimeout(fetchZeitfenster, 0);
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") fetchZeitfenster();
-    };
-    window.addEventListener("pageshow", fetchZeitfenster);
-    document.addEventListener("visibilitychange", handleVisibility);
+    mounted.current = true;
+    const initial = window.setTimeout(load, 0);
+    const tick = window.setInterval(() => setNow(Date.now()), 30000);
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    const unsubscribe = subscribeToTables({ tables: ["zeitfenster"], onChange: load });
     return () => {
-      window.clearTimeout(initialLoadTimer);
-      window.removeEventListener("pageshow", fetchZeitfenster);
-      document.removeEventListener("visibilitychange", handleVisibility);
+      mounted.current = false;
+      requestId.current += 1;
+      window.clearTimeout(initial);
+      window.clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisible);
+      unsubscribe();
     };
-  }, [fetchZeitfenster]);
+  }, [load]);
+  const dirty = Object.keys(state.drafts).length > 0;
+  useEffect(() => {
+    const warn = event => { if (dirty) { event.preventDefault(); event.returnValue = ""; } };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
-  useEffect(() => subscribeToTables({ tables: ["zeitfenster"], onChange: fetchZeitfenster }), [fetchZeitfenster]);
-
-  const resetFenster = (fensterId) => {
-    const original = originalZeitfenster.find((item) => item.id === fensterId);
-    if (!original) return;
-    setZeitfenster((prev) => prev.map((item) => (item.id === fensterId ? { ...original } : item)));
-  };
-
-  const aktualisiereZeitfenster = (id, feld, wert) => {
-    let result = { ok: false };
-    setZeitfenster((prev) => {
-      const next = prev.map((z) => (z.id === id ? { ...z, [feld]: wert } : z));
-      const aktuellesFenster = next.find((z) => z.id === id);
-      const validation = validateFenster(aktuellesFenster, next);
-      if (!validation.ok) {
-        setHinweis(validation.message);
-        result = validation;
-        return prev;
-      }
-      setHinweis("");
-      result = { ok: true };
-      return next;
-    });
-    return result;
-  };
-
-  const speichereZeitfenster = async (fenster) => {
-    if (!fenster.start || !fenster.ende) {
-      setHinweis("❌ Bitte Start und Ende ausfüllen.");
-      return;
-    }
-
-    setSavingWettkampf(fenster.wettkampf);
-    const normalized = { ...fenster };
-    const basisListe = zeitfenster.map((item) => (item.id === fenster.id ? normalized : item));
-    const validation = validateFenster(normalized, basisListe);
-    if (!validation.ok) {
-      setHinweis(validation.message);
-      resetFenster(fenster.id);
-      setSavingWettkampf(null);
-      return;
-    }
-
-    const activeSeason = getActiveSeason();
-    const { data, error: findError } = await supabase.from("zeitfenster").select("id").eq("wettkampf", normalized.wettkampf).eq("saison", activeSeason).maybeSingle();
-    if (findError) {
-      logError("Zeitfenster konnte nicht gefunden werden.");
-      setHinweis("❌ Fehler beim Suchen in der Datenbank");
-      setSavingWettkampf(null);
-      return;
-    }
-
-    let updateError;
-    if (data) {
-      ({ error: updateError } = await supabase.from("zeitfenster").update({ start: normalized.start, ende: normalized.ende }).eq("wettkampf", normalized.wettkampf).eq("saison", activeSeason));
+  const save = async (wk, reset = false) => {
+    if (busy.current || state.loading || state.loadError) return;
+    const row = state.rows.find(item => Number(item.wettkampf) === wk);
+    const draft = state.drafts[wk];
+    if (reset) {
+      if (!row || !window.confirm("Zeitfenster von WK" + wk + " für Saison " + season + " wirklich entfernen? Beginn und Ende werden gelöscht. Ergebnisse bleiben erhalten, sind ohne Zeitfenster aber gegebenenfalls nicht mehr öffentlich sichtbar.")) return;
     } else {
-      ({ error: updateError } = await supabase.from("zeitfenster").insert(withSeasonPayload({ wettkampf: normalized.wettkampf, start: normalized.start, ende: normalized.ende }, activeSeason)));
+      if (!draft) return;
+      const message = validateWindow(draft, state.rows);
+      if (message) { dispatch({ type: "error", wk, message }); return; }
     }
-
-    if (updateError) {
-      logError("Zeitfenster konnte nicht gespeichert werden.");
-      setHinweis("❌ Fehler beim Speichern");
-      setSavingWettkampf(null);
-      return;
-    }
-
-    setOpenEditorKey(null);
-    setSavingWettkampf(null);
-    setHinweis(`✅ Zeitfenster WK${normalized.wettkampf} gespeichert.`);
-    setGespeichert(normalized.wettkampf);
-    await fetchZeitfenster();
-    onRefreshStats?.();
-    setTimeout(() => {
-      setHinweis("");
-      setGespeichert(null);
-    }, 2500);
+    busy.current = true;
+    requestId.current += 1;
+    dispatch({ type: "pending", wk });
+    try {
+      const result = await request(supabase.rpc("admin_save_wk_window", {
+        p_saison: String(season), p_wettkampf: wk,
+        p_start: reset ? null : new Date(draft.start).toISOString(),
+        p_ende: reset ? null : new Date(draft.ende).toISOString(),
+        p_expected: reset ? windowSnapshot(row) : draft.expected, p_reset: reset,
+      }));
+      if (!result || result.wettkampf !== wk || result.reset !== reset || (!reset && !result.row?.id)) {
+        throw new Error("Unvollständige Speicherbestätigung. Bitte gespeicherten Stand neu laden und prüfen.");
+      }
+      if (!mounted.current) return;
+      dispatch({ type: "saved", wk, row: result.row, message: reset
+        ? "WK" + wk + ": Zeitfenster entfernt. In der Datenbank bestätigt."
+        : "WK" + wk + " gespeichert: " + formatDate(result.row.start) + " – " + formatDate(result.row.ende) + ". In der Datenbank bestätigt." });
+      setNow(Date.now());
+      Promise.resolve().then(() => statsCallback.current?.()).catch(() => undefined);
+    } catch (error) {
+      if (mounted.current) dispatch({ type: "error", wk, message: friendlyError(error) });
+    } finally { busy.current = false; }
   };
-
-  const istOffen = (startStr, endeStr) => {
-    if (!startStr || !endeStr) return false;
-    const start = Date.parse(startStr);
-    const ende = Date.parse(endeStr);
-    return currentTime >= start && currentTime <= ende;
-  };
-
-  const formatDatum = (isoString) => {
-    if (!isoString) return "";
-    const date = new Date(isoString);
-    return date.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  };
-
-  const zaehleOffeneFenster = () => zeitfenster.filter((z) => istOffen(z.start, z.ende)).length;
-  const zaehleGespeicherteFenster = () => zeitfenster.filter((z) => z.start && z.ende).length;
-
+  const opened = state.rows.filter(row => evaluateZeitfenster(row, now).offen).length;
+  const labels = { open: "Offen", closed: "Geschlossen", upcoming: "Bevorstehend", invalid: "Ungültig", not_set: "Nicht festgelegt" };
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   return (
-    <div className="space-y-6">
-      <div className="rounded-3xl border border-zinc-200 bg-gradient-to-r from-white via-emerald-50/60 to-cyan-50/60 p-5 shadow-[0_1px_2px_rgba(16,24,40,0.05)] sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-600">Wettkampffenster</p>
-            <h2 className="mt-2 text-2xl font-semibold text-zinc-900">Zeitfenster</h2>
-            <p className="mt-2 max-w-3xl text-sm text-zinc-600 sm:text-base">Hier werden Start- und Endzeiten für alle 9 Wettkämpfe festgelegt. Änderungen können direkt pro Wettkampf gespeichert werden.</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Gesamt</p><p className="mt-2 text-2xl font-semibold text-zinc-900">9</p><p className="mt-1 text-sm text-zinc-500">Wettkämpfe</p></div>
-            <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Gespeichert</p><p className="mt-2 text-2xl font-semibold text-zinc-900">{zaehleGespeicherteFenster()}</p><p className="mt-1 text-sm text-zinc-500">Mit Zeitfenster</p></div>
-            <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Aktuell offen</p><p className="mt-2 text-2xl font-semibold text-zinc-900">{zaehleOffeneFenster()}</p><p className="mt-1 text-sm text-zinc-500">Freigegebene WK</p></div>
-          </div>
+    <div className="space-y-5">
+      <header className="rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-white p-5 sm:p-6">
+        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Wettkampfplanung · Saison {season}</p>
+        <h2 className="mt-2 text-2xl font-semibold text-zinc-900">WK-Zeitfenster</h2>
+        <p className="mt-2 text-sm text-zinc-600">Nur ein WK darf gleichzeitig offen sein. Beginn und Ende gemeinsam bearbeiten und anschließend speichern.</p>
+        <p className="mt-2 text-sm text-zinc-600">Alle Uhrzeiten: {timezone}. Beginn und Ende zählen zum offenen Zeitraum; zwischen zwei Fenstern mindestens eine Minute Abstand lassen.</p>
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+          <span className="rounded-full border bg-white px-3 py-2">{state.rows.filter(row => row.start && row.ende).length} von 9 festgelegt</span>
+          <span className="rounded-full border bg-white px-3 py-2">{opened} aktuell offen</span>
+          <button className="btn btn-secondary" onClick={load} disabled={state.loading || state.pending !== null}>{state.loading ? "Lädt …" : "Gespeicherten Stand laden"}</button>
         </div>
-      </div>
-
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h3 className="text-xl font-semibold text-zinc-900">Alle Zeitfenster</h3>
-          <p className="mt-1 text-sm text-zinc-600">Jeder Wettkampf kann einzeln bearbeitet und gespeichert werden.</p>
-        </div>
-        {hinweis ? <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-700 shadow-sm">{hinweis}</div> : null}
-      </div>
-
-      <div className="grid gap-4">
-        {zeitfenster.map((z) => {
-          const offen = istOffen(z.start, z.ende);
-          const gesetzt = Boolean(z.start && z.ende);
-          const geschlossen = gesetzt && !offen;
-          const startInZukunft = gesetzt && Date.parse(z.start) > currentTime;
-          const containerClass = offen ? "border-emerald-200 bg-emerald-50/50 shadow-[0_14px_34px_rgba(16,185,129,0.10)]" : startInZukunft ? "border-amber-200 bg-amber-50/55 shadow-[0_12px_30px_rgba(245,158,11,0.10)]" : geschlossen ? "border-rose-200 bg-rose-50/55 shadow-[0_12px_30px_rgba(244,63,94,0.08)]" : "border-zinc-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:border-zinc-300 hover:shadow-[0_12px_28px_rgba(16,24,40,0.08)]";
-          const statusBadgeClass = offen ? "border-emerald-200 bg-emerald-100 text-emerald-800" : startInZukunft ? "border-amber-200 bg-amber-100 text-amber-800" : geschlossen ? "border-rose-200 bg-rose-100 text-rose-700" : "border-zinc-200 bg-zinc-50 text-zinc-600";
-          const detailBadgeClass = gesetzt ? startInZukunft ? "border-amber-200 bg-white text-amber-700" : offen ? "border-emerald-200 bg-white text-emerald-700" : "border-rose-200 bg-white text-rose-700" : "border-zinc-200 bg-white text-zinc-500";
-
-          return (
-            <div key={z.wettkampf} className={`rounded-3xl border p-4 transition-all duration-200 sm:p-5 ${containerClass}`}>
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 text-sm font-bold text-white shadow-sm">WK{z.wettkampf}</div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClass}`}>{offen ? "offen" : startInZukunft ? "gesetzt" : geschlossen ? "geschlossen" : "ungeplant"}</span>
-                      <span className={`rounded-full border px-3 py-1 text-xs font-medium ${detailBadgeClass}`}>{gesetzt ? "Zeitfenster gesetzt" : "Noch nicht gesetzt"}</span>
-                    </div>
-                    <p className="mt-2 text-sm text-zinc-600">{z.start && z.ende ? `Gespeichert: ${formatDatum(z.start)} – ${formatDatum(z.ende)}` : "Bitte Start und Ende für diesen Wettkampf festlegen."}</p>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 overflow-visible md:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_auto] md:items-start">
-                  <DateTimeEditor label="Startdatum" value={z.start} editorKey={`${z.id}-start`} openEditorKey={openEditorKey} onToggle={setOpenEditorKey} onApply={(val) => aktualisiereZeitfenster(z.id, "start", val)} />
-                  <DateTimeEditor label="Enddatum" value={z.ende} editorKey={`${z.id}-ende`} openEditorKey={openEditorKey} onToggle={setOpenEditorKey} onApply={(val) => aktualisiereZeitfenster(z.id, "ende", val)} />
-                  <button type="button" onClick={() => speichereZeitfenster(z)} disabled={savingWettkampf === z.wettkampf} className={`btn-action min-h-[46px] w-full md:w-auto ${gespeichert === z.wettkampf ? "ring-2 ring-emerald-500/30" : ""} ${savingWettkampf === z.wettkampf ? "cursor-wait opacity-70" : ""}`}>{savingWettkampf === z.wettkampf ? "Speichert…" : "Speichern"}</button>
-                </div>
-              </div>
+      </header>
+      {state.loadError && <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">{state.loadError}</div>}
+      {opened > 1 && <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">Der gespeicherte Altbestand enthält mehrere offene WK. Bitte die überlappenden Zeitfenster korrigieren.</div>}
+      {dirty && <p className="text-sm text-amber-800" role="status">Ungespeicherte Änderungen vorhanden. Automatisches Nachladen überschreibt deine Entwürfe nicht.</p>}
+      {Array.from({ length: 9 }, (_, i) => i + 1).map(wk => {
+        const row = state.rows.find(item => Number(item.wettkampf) === wk);
+        const draft = state.drafts[wk];
+        const status = evaluateZeitfenster(row, now);
+        const feedback = state.feedback[wk];
+        const disabled = state.pending !== null || state.loading || !!state.loadError;
+        return (
+          <section key={wk} aria-label={"WK" + wk} className={"rounded-3xl border p-4 sm:p-5 " + (status.offen ? "border-emerald-300 bg-emerald-50/40" : "border-zinc-200 bg-white")}>
+            <div className="flex flex-wrap items-center gap-3">
+              <h3 className="text-lg font-bold text-zinc-900">WK{wk}</h3>
+              <span className="rounded-full border bg-white px-3 py-1 text-xs">{labels[status.code]}</span>
+              {draft && <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">Nicht gespeichert</span>}
             </div>
-          );
-        })}
-      </div>
+            <p className="mt-2 text-sm text-zinc-600">Gespeicherter Stand: {row?.start && row?.ende ? formatDate(row.start) + " – " + formatDate(row.ende) : "Kein Zeitfenster"}</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {[["start", "Beginn"], ["ende", "Ende"]].map(([field, label]) => (
+                <label key={field} className="block min-w-0 text-sm font-semibold text-zinc-700">
+                  {label}
+                  <input aria-label={"WK" + wk + " " + label} type="datetime-local" step="60" className="input mt-1 block w-full min-w-0" disabled={disabled}
+                    value={draft ? draft[field] : toLocalInput(row?.[field])}
+                    onChange={event => dispatch({ type: "edit", wk, field, value: event.target.value })} />
+                </label>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button className="btn btn-primary" onClick={() => save(wk)} disabled={disabled || !draft}>{state.pending === wk ? "Wird gespeichert …" : "Änderungen speichern"}</button>
+              <button className="btn btn-secondary" onClick={() => dispatch({ type: "discard", wk })} disabled={disabled || !draft}>Änderungen verwerfen</button>
+              <button className="btn btn-secondary !text-rose-700" onClick={() => save(wk, true)} disabled={disabled || !row}>Zeitfenster entfernen</button>
+            </div>
+            {feedback && <div role={feedback.tone === "error" ? "alert" : "status"} className={"mt-4 rounded-2xl border px-4 py-3 text-sm " + (feedback.tone === "error" ? "border-rose-200 bg-rose-50 text-rose-800" : feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-zinc-200 bg-zinc-50 text-zinc-700")}>{feedback.text}</div>}
+          </section>
+        );
+      })}
     </div>
   );
 }
