@@ -10,7 +10,7 @@ export function sessionMessage(reason) {
     unsupported: "Dieser Browser unterstützt die benötigte Tabsperre nicht. Bitte einen aktuellen Browser verwenden.",
     unavailable: "Die Vereinssperre ist auf dem Server noch nicht eingerichtet oder nicht kompatibel. Der Vereinsbereich bleibt zum Schutz der Daten gesperrt. Bitte die Administration verständigen.",
     account_changed: "In diesem Browser wurde die Anmeldung gewechselt. Die bisherige Vereinssitzung kann nicht weiterbearbeitet werden.",
-    different_account: "In diesem Browser ist bereits ein anderes Konto angemeldet. Bitte dieses zuerst regulär verlassen oder einen anderen Browser verwenden.",
+    different_account: "In diesem Browser ist noch ein anderes Konto gespeichert – auch wenn kein Tab mehr geöffnet ist. Bitte zuerst abmelden und das Konto wechseln.",
     network: "Die Vereinssitzung konnte nicht bestätigt werden. Eingaben sind vorübergehend gesperrt. Bereits eingegebene Daten bleiben in diesem geöffneten Tab erhalten. Bitte die Verbindung prüfen und erneut versuchen.",
   })[reason] || "Die Vereinssitzung konnte nicht bestätigt werden. Bitte erneut versuchen.";
 }

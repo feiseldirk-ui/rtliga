@@ -13,6 +13,7 @@ export default function VereinLogin({ onLoginErfolg }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fehler, setFehler] = useState("");
+  const [switchAvailable, setSwitchAvailable] = useState(false);
 
   useEffect(() => {
     const presetEmail = (searchParams.get("email") || "").trim().toLowerCase();
@@ -24,6 +25,7 @@ export default function VereinLogin({ onLoginErfolg }) {
   const handleLogin = async (e) => {
     e.preventDefault();
     setFehler("");
+    setSwitchAvailable(false);
     setLoading(true);
 
     try {
@@ -37,6 +39,7 @@ export default function VereinLogin({ onLoginErfolg }) {
     } catch (error) {
       logError("Login-Vorgang fehlgeschlagen.");
       setFehler(error.message || "Beim Login ist ein Fehler aufgetreten.");
+      setSwitchAvailable(error.reason === "different_account" || error.reason === "ended");
     } finally {
       setLoading(false);
     }
@@ -115,6 +118,9 @@ export default function VereinLogin({ onLoginErfolg }) {
           {fehler ? (
             <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {fehler}
+              {switchAvailable && <button type="button" className="btn btn-secondary mt-3 w-full" onClick={() => {
+                window.dispatchEvent(new CustomEvent("rtliga-confirm-account-switch", { detail: { target: "/login" } }));
+              }}>Gespeichertes Konto wechseln</button>}
             </div>
           ) : null}
 

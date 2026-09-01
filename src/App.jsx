@@ -8,6 +8,7 @@ import PasswortZuruecksetzen from "./features/auth/pages/PasswortZuruecksetzen";
 import AdminsTab from "./features/admin/components/AdminsTab";
 import VereinStart from "./features/verein/components/VereinStart";
 import VereinSessionGate from "./features/auth/components/VereinSessionGate";
+import IdleSessionGuard from "./features/auth/components/IdleSessionGuard";
 import HomePage from "./features/public/components/HomePage";
 import PublicResultsPage from "./features/public/components/PublicResultsPage";
 import { logError } from "./lib/logger";
@@ -117,7 +118,7 @@ export default function App() {
   }
 
   return (
-    <Routes>
+    <IdleSessionGuard><Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/ergebnisse" element={<PublicResultsPage />} />
       <Route
@@ -141,6 +142,6 @@ export default function App() {
       />
       <Route path="/admin" element={<AdminRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    </Routes></IdleSessionGuard>
   );
 }
