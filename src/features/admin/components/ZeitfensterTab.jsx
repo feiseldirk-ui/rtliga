@@ -4,6 +4,7 @@ import { subscribeToTables } from "../../../lib/realtime";
 import { getActiveSeason } from "../../../lib/seasonScope";
 import { evaluateZeitfenster } from "../../../lib/wettkampfZeitfenster";
 import { initialWindowState, toLocalInput, validateWindow, windowReducer, windowSnapshot } from "../../../lib/timeWindowAdmin";
+import DateTimePicker from "../../../shared/ui/DateTimePicker";
 
 const formatDate = value => value ? new Date(value).toLocaleString("de-DE", {
   day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
@@ -139,12 +140,13 @@ export default function ZeitfensterTab({ onRefreshStats }) {
             <p className="mt-2 text-sm text-zinc-600">Gespeicherter Stand: {row?.start && row?.ende ? formatDate(row.start) + " – " + formatDate(row.ende) : "Kein Zeitfenster"}</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {[["start", "Beginn"], ["ende", "Ende"]].map(([field, label]) => (
-                <label key={field} className="block min-w-0 text-sm font-semibold text-zinc-700">
-                  {label}
-                  <input aria-label={"WK" + wk + " " + label} type="datetime-local" step="60" className="input mt-1 block w-full min-w-0" disabled={disabled}
+                <div key={field} className="min-w-0 text-sm text-zinc-700">
+                  <p className="mb-1 font-semibold">{label}</p>
+                  <DateTimePicker label={"WK" + wk + " – " + label} disabled={disabled}
                     value={draft ? draft[field] : toLocalInput(row?.[field])}
-                    onChange={event => dispatch({ type: "edit", wk, field, value: event.target.value })} />
-                </label>
+                    revision={JSON.stringify(windowSnapshot(row))}
+                    onChange={value => dispatch({ type: "edit", wk, field, value })} />
+                </div>
               ))}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
