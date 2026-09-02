@@ -7,6 +7,7 @@ import { clearVereinSession, readVereinSession } from "../../../lib/storage/vere
 import { createIdleClock, formatIdleCountdown, isIdleActivity, logoutMatchingSession } from "../../../lib/idleSessionCore";
 import { stopGlobalAudio } from "../../../shared/media/audioPlayer";
 import AppDialog from "../../../shared/ui/AppDialog";
+import { adminSessionApi, readAdminIdentity, writeAdminIdentity } from "../../../lib/adminSession";
 
 export default function IdleSessionGuard({ children }) {
   const navigate = useNavigate();
@@ -38,7 +39,8 @@ export default function IdleSessionGuard({ children }) {
       timeout = window.setTimeout(() => {
         if (mountedRef.current) setError("Die Abmeldung dauert länger. Eingaben bleiben gesperrt. Bitte Verbindung prüfen.");
       }, 15000);
-      const result = await logoutMatchingSession(supabase, clubSessionApi, task.club, task.identity, sessionIdentity);
+      const result = await logoutMatchingSession(supabase, clubSessionApi, task.club, task.identity, sessionIdentity,
+        { adminApi: adminSessionApi, adminIdentity: task.adminIdentity });
       if (!mountedRef.current || endingRef.current !== task) return;
       endingRef.current = null;
       setEnding(null);
@@ -48,6 +50,7 @@ export default function IdleSessionGuard({ children }) {
       }
       clearVereinSession();
       try {
+        writeAdminIdentity(null);
         sessionStorage.removeItem("rtliga_admin_access_verified");
         sessionStorage.removeItem("rtliga_admin_logout_redirect");
       } catch { /* The auth operation above remains authoritative. */ }
@@ -67,7 +70,7 @@ export default function IdleSessionGuard({ children }) {
   const beginLogout = useCallback((reason = "idle", target) => {
     if (endingRef.current || !identityRef.current) return;
     clockRef.current?.expire(reason);
-    const task = { identity: identityRef.current, club: readVereinSession(), reason,
+    const task = { identity: identityRef.current, club: readVereinSession(), adminIdentity: readAdminIdentity(), reason,
       target: target || (pathRef.current === "/admin" ? "/admin" : "/login") };
     endingRef.current = task;
     setEnding(task);
@@ -75,6 +78,7 @@ export default function IdleSessionGuard({ children }) {
     stopGlobalAudio();
     // Stops club renewals immediately, also during offline/failed auth logout.
     window.dispatchEvent(new Event("rtliga-club-session-ended"));
+    window.dispatchEvent(new Event("rtliga-admin-session-ended"));
     void finish();
   }, [finish]);
 
@@ -143,7 +147,7 @@ export default function IdleSessionGuard({ children }) {
       if (identityRef.current && !endingRef.current) setConfirmSwitch({ identity: identityRef.current, target: event.detail?.target === "/admin" ? "/admin" : "/login" });
       else if (!identityRef.current) setNotice("Es ist kein Konto mehr gespeichert. Bitte erneut anmelden.");
     };
-    const requestLogout = () => beginLogout("manual");
+    const requestLogout = event => beginLogout("manual", event.detail?.target === "/" ? "/" : undefined);
     const online = () => { if (endingRef.current) void finish(); };
     window.addEventListener("rtliga-confirm-account-switch", requestSwitch);
     window.addEventListener("rtliga-request-logout", requestLogout);

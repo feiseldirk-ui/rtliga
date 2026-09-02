@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
 import supabase from "../../../lib/supabase/client";
 import { logError } from "../../../lib/logger";
-import { waitForSession } from "../../../lib/authReady";
+import AdminSessionGate from "../../auth/components/AdminSessionGate";
 import { subscribeToTables } from "../../../lib/realtime";
 import ZeitfensterTab from "./ZeitfensterTab";
 import ErgebnisseTab from "./ErgebnisseTab";
@@ -12,7 +11,6 @@ import ArchivTab from "./ArchivTab";
 import RundenprotokollTab from "./RundenprotokollTab";
 import AdminManagementTab from "./AdminManagementTab";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
-import { stopGlobalAudio } from "../../../shared/media/audioPlayer";
 import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 
 const INITIAL_STATS = {
@@ -21,18 +19,6 @@ const INITIAL_STATS = {
   offeneZeitfenster: 0,
   ergebnisse: 0,
 };
-const ADMIN_LOGOUT_REDIRECT_KEY = "rtliga_admin_logout_redirect";
-const ADMIN_ACCESS_FLAG_KEY = "rtliga_admin_access_verified";
-
-function getHomeHref() {
-  const basePath = import.meta.env.BASE_URL || "/";
-  return new URL(basePath, window.location.origin).href;
-}
-
-function redirectToHome() {
-  window.location.replace(getHomeHref());
-}
-
 function StatBadge({ label, value }) {
   return (
     <div className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-zinc-700 shadow-sm">
@@ -44,18 +30,12 @@ function StatBadge({ label, value }) {
 
 
 export default function AdminsTab() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [adminEmail, setAdminEmail] = useState("");
-  const [passwort, setPasswort] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [checked, setChecked] = useState(false);
-  const [verified, setVerified] = useState(false);
-  const [authError, setAuthError] = useState("");
+  return <AdminSessionGate>{(record, logout) => <AdminDashboard adminEmail={record.email} logout={logout} />}</AdminSessionGate>;
+}
+
+function AdminDashboard({ adminEmail, logout }) {
   const [activeTab, setActiveTab] = useState("vereine");
   const [stats, setStats] = useState(INITIAL_STATS);
-  const [loggingOut, setLoggingOut] = useState(false);
 
   const tabs = useMemo(
     () => [
@@ -71,13 +51,6 @@ export default function AdminsTab() {
   );
 
   const activeTabData = tabs.find((tab) => tab.key === activeTab) || tabs[0];
-
-  useEffect(() => {
-    const presetEmail = (searchParams.get("email") || "").trim().toLowerCase();
-    if (!verified && presetEmail) {
-      setAdminEmail((current) => current || presetEmail);
-    }
-  }, [searchParams, verified]);
 
   const ladeDashboardStats = useCallback(async () => {
     try {
@@ -108,303 +81,15 @@ export default function AdminsTab() {
     }
   }, []);
 
-  const checkAdminSession = useCallback(async (sessionOverride) => {
-    try {
-      let session = sessionOverride;
-
-      if (sessionOverride === undefined) {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        session = data?.session || null;
-      }
-
-      if (!session?.user) {
-        setVerified(false);
-        setChecked(true);
-        setStats(INITIAL_STATS);
-        return;
-      }
-
-      const currentUser = session.user;
-      const accessFlag = window.sessionStorage.getItem(ADMIN_ACCESS_FLAG_KEY);
-
-      if (accessFlag !== "1") {
-        setVerified(false);
-        setChecked(true);
-        setStats(INITIAL_STATS);
-        setAuthError("");
-        setAdminEmail(currentUser.email || "");
-        return;
-      }
-
-      const { data: adminRow, error: adminError } = await supabase
-        .from("admins")
-        .select("user_id")
-        .eq("user_id", currentUser.id)
-        .maybeSingle();
-
-      if (adminError || !adminRow) {
-        await supabase.auth.signOut();
-        setVerified(false);
-        setChecked(true);
-        setAuthError("Dieses Konto besitzt keinen Adminzugang.");
-        setStats(INITIAL_STATS);
-        return;
-      }
-
-      setVerified(true);
-      setChecked(true);
-      setAuthError("");
-      setAdminEmail(currentUser.email || "");
-      await ladeDashboardStats();
-    } catch {
-      setVerified(false);
-      setChecked(true);
-      setAuthError("Der Adminstatus konnte nicht geprüft werden.");
-      setStats(INITIAL_STATS);
-    }
-  }, [ladeDashboardStats]);
+  useEffect(() => subscribeToTables({
+    tables: ["vereine", "verein_teilnehmer", "verein_ergebnisse", "zeitfenster"],
+    onChange: ladeDashboardStats,
+  }), [ladeDashboardStats]);
 
   useEffect(() => {
-    checkAdminSession();
-    let authTimer = null;
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      window.clearTimeout(authTimer);
-      authTimer = window.setTimeout(() => checkAdminSession(session), 0);
-    });
-
-    return () => {
-      window.clearTimeout(authTimer);
-      subscription.unsubscribe();
-    };
-  }, [checkAdminSession]);
-
-  useEffect(() => {
-    if (!verified) return undefined;
-
-    return subscribeToTables({
-      tables: ["vereine", "verein_teilnehmer", "verein_ergebnisse", "zeitfenster"],
-      onChange: ladeDashboardStats,
-    });
-  }, [ladeDashboardStats, verified]);
-
-  useEffect(() => {
-    if (!verified) return;
-    ladeDashboardStats();
-  }, [activeTab, ladeDashboardStats, verified]);
-
-  const handleAdminLogin = async (event) => {
-    event.preventDefault();
-    setLoading(true);
-    setAuthError("");
-
-    const normalizedEmail = adminEmail.trim().toLowerCase();
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password: passwort,
-      });
-
-      if (error || !data?.user) {
-        setAuthError("Admin-Login fehlgeschlagen. Bitte Kennwort prüfen.");
-        return;
-      }
-
-      const session = await waitForSession(4000);
-      if (!session) {
-        setAuthError("Die Admin-Sitzung konnte nicht geladen werden. Bitte erneut versuchen.");
-        return;
-      }
-
-      const { data: adminRow, error: adminError } = await supabase
-        .from("admins")
-        .select("user_id")
-        .eq("user_id", data.user.id)
-        .maybeSingle();
-
-      if (adminError || !adminRow) {
-        await supabase.auth.signOut();
-        setAuthError("Das Konto ist nicht als Admin freigeschaltet.");
-        return;
-      }
-
-      try {
-        window.sessionStorage.setItem(ADMIN_ACCESS_FLAG_KEY, "1");
-      } catch {
-        // noop
-      }
-
-      setVerified(true);
-      setChecked(true);
-      setAdminEmail(data.user.email || normalizedEmail);
-      setPasswort("");
-      await ladeDashboardStats();
-    } catch {
-      setAuthError("Admin-Login fehlgeschlagen. Bitte erneut versuchen.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = async () => {
-    if (loggingOut) return;
-
-    setLoggingOut(true);
-
-    try {
-      window.sessionStorage.setItem(ADMIN_LOGOUT_REDIRECT_KEY, "1");
-      window.sessionStorage.removeItem(ADMIN_ACCESS_FLAG_KEY);
-    } catch {
-      // noop
-    }
-
-    setVerified(false);
-    setChecked(true);
-    setAuthError("");
-    setAdminEmail("");
-    setPasswort("");
-    setStats(INITIAL_STATS);
-
-    const fallbackTimer = window.setTimeout(() => {
-      redirectToHome();
-    }, 60);
-
-    try {
-      stopGlobalAudio();
-      try {
-        await supabase.auth.signOut({ scope: "global" });
-      } catch {
-        await supabase.auth.signOut({ scope: "local" });
-      }
-    } catch {
-      logError("Admin konnte nicht vollständig abgemeldet werden.");
-    }
-
-    try {
-      for (const storage of [window.localStorage, window.sessionStorage]) {
-        const keys = Object.keys(storage);
-        for (const key of keys) {
-          if (key.startsWith("sb-") || key.includes("supabase")) {
-            storage.removeItem(key);
-          }
-        }
-      }
-      window.sessionStorage.setItem(ADMIN_LOGOUT_REDIRECT_KEY, "1");
-      window.sessionStorage.removeItem(ADMIN_ACCESS_FLAG_KEY);
-    } catch {
-      logError("Lokale Auth-Daten konnten nicht vollständig entfernt werden.");
-    }
-
-    window.clearTimeout(fallbackTimer);
-    redirectToHome();
-  };
-
-  if (!checked) {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="card p-8 text-center">Adminzugang wird geprüft…</div>
-      </div>
-    );
-  }
-
-  if (!verified) {
-    try {
-      if (window.sessionStorage.getItem(ADMIN_LOGOUT_REDIRECT_KEY) === "1") {
-        redirectToHome();
-        return null;
-      }
-    } catch {
-      // noop
-    }
-
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="card animate-fade-in overflow-hidden">
-          <div className="border-b border-zinc-200 bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 px-6 py-8 text-white sm:px-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/80">RTLiga Verwaltung</p>
-            <h2 className="mt-3 text-3xl font-semibold">Admin-Anmeldung</h2>
-            <p className="mt-2 max-w-2xl text-sm text-white/85 sm:text-base">
-              Adminzugang ist ausschließlich für das freigeschaltete Konto vorgesehen. Kennwort-Änderungen erfolgen nur über die hinterlegte Admin-E-Mail.
-            </p>
-          </div>
-
-          <div className="space-y-5 px-6 py-6 sm:px-8 sm:py-8">
-            <form onSubmit={handleAdminLogin} className="space-y-4">
-              <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                Adminzugang erfolgt über die freigeschaltete Admin-E-Mail und das zugehörige Kennwort.
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-zinc-700">Admin-E-Mail</label>
-                <input
-                  type="email"
-                  value={adminEmail}
-                  onChange={(event) => setAdminEmail(event.target.value)}
-                  className="input max-w-xl"
-                  autoComplete="email"
-                  placeholder="admin@beispiel.de"
-                  required
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <label className="block text-sm font-semibold text-zinc-700">Kennwort</label>
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
-                    onClick={() => setShowPassword((value) => !value)}
-                  >
-                    {showPassword ? "Verbergen" : "Anzeigen"}
-                  </button>
-                </div>
-
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={passwort}
-                  onChange={(event) => setPasswort(event.target.value)}
-                  className="input max-w-md"
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
-
-              {authError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {authError}
-                </div>
-              ) : null}
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button className="btn btn-primary" type="submit" disabled={loading}>
-                  {loading ? "Anmeldung läuft…" : "Admin anmelden"}
-                </button>
-
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  onClick={() => {
-                    const params = new URLSearchParams();
-                    params.set("context", "admin");
-                    params.set("back", "/admin");
-                    if (adminEmail.trim()) {
-                      params.set("email", adminEmail.trim().toLowerCase());
-                    }
-                    navigate(`/passwort-vergessen?${params.toString()}`);
-                  }}
-                >
-                  Kennwort vergessen?
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    const timer = window.setTimeout(ladeDashboardStats, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, ladeDashboardStats]);
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -438,10 +123,9 @@ export default function AdminsTab() {
                 className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:opacity-60"
                 type="button"
                 onClick={logout}
-                disabled={loggingOut}
               >
                 <span className="text-sm leading-none">⏻</span>
-                <span className="hidden sm:inline">{loggingOut ? "…" : "Verlassen"}</span>
+                <span className="hidden sm:inline">Verlassen</span>
               </button>
             </div>
           </div>

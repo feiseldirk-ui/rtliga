@@ -142,7 +142,7 @@ export async function endClubSession(client, api, clubId, identity) {
 }
 
 // The local Web Lock protects tabs, not devices. Only the server can protect devices.
-export function createClubSessionMonitor({ api, clubId, locks, onChange, now = () => performance.now(), intervalMs = 30000 }) {
+export function createClubSessionMonitor({ api, clubId, locks, onChange, now = () => performance.now(), intervalMs = 30000, lockName = `rtliga-club-editor:${clubId}` }) {
   let running = false;
   let generation = 0;
   let releaseTab;
@@ -204,7 +204,7 @@ export function createClubSessionMonitor({ api, clubId, locks, onChange, now = (
       running = true;
       const token = ++generation;
       if (!locks?.request) { publish("blocked", "unsupported"); return; }
-      Promise.resolve(locks.request(`rtliga-club-editor:${clubId}`, { ifAvailable: true }, async (lock) => {
+      Promise.resolve(locks.request(lockName, { ifAvailable: true }, async (lock) => {
         if (!running || token !== generation) return;
         if (!lock) { publish("blocked", "tab_busy"); return; }
         localOwner = true;

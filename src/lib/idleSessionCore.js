@@ -61,7 +61,7 @@ export function formatIdleCountdown(remainingMs) {
 }
 
 // Never sign out a different/newer identity, and never use global signOut.
-export async function logoutMatchingSession(client, api, club, identity, identify) {
+export async function logoutMatchingSession(client, api, club, identity, identify, { adminApi, adminIdentity } = {}) {
   const getMatching = async () => {
     const { data, error } = await client.auth.getSession();
     if (error) throw new Error("Anmeldung konnte nicht geprüft werden.");
@@ -69,6 +69,11 @@ export async function logoutMatchingSession(client, api, club, identity, identif
   };
   const current = await getMatching();
   if (!identity || !current.matches) return { changed: Boolean(current.session) };
+  if (adminApi && adminIdentity === identity) {
+    try { await adminApi.request("release"); } catch { /* Still attempt local auth revocation. */ }
+  }
+  const afterAdmin = await getMatching();
+  if (!afterAdmin.matches) return { changed: Boolean(afterAdmin.session) };
   if (club?.id && club.identity === identity) {
     try { await api.request("release", club.id); } catch { /* Auth revocation is still attempted. */ }
   }
