@@ -13,6 +13,8 @@ export default function VereinRegistrierung() {
   const [loading, setLoading] = useState(false);
   const [meldung, setMeldung] = useState("");
   const [fehler, setFehler] = useState("");
+  const [kennwortSichtbar, setKennwortSichtbar] = useState(false);
+  const [kennwortWdhSichtbar, setKennwortWdhSichtbar] = useState(false);
 
   const handleRegistrieren = async (event) => {
     event.preventDefault();
@@ -36,8 +38,17 @@ export default function VereinRegistrierung() {
       return;
     }
 
-    if (passwort.length < 8) {
-      setFehler("Das Kennwort muss mindestens 8 Zeichen lang sein.");
+    const kennwortGueltig =
+      passwort.length >= 8 &&
+      /[a-z]/.test(passwort) &&
+      /[A-Z]/.test(passwort) &&
+      /[0-9]/.test(passwort) &&
+      /[^A-Za-z0-9]/.test(passwort);
+
+    if (!kennwortGueltig) {
+      setFehler(
+        "Das Kennwort muss mindestens 8 Zeichen lang sein und mindestens einen Großbuchstaben, einen Kleinbuchstaben, eine Zahl und ein Sonderzeichen enthalten."
+      );
       setLoading(false);
       return;
     }
@@ -51,17 +62,20 @@ export default function VereinRegistrierung() {
       if (signUpError || !signUpData?.user?.id) {
         console.error("Supabase signUp fehlgeschlagen:", signUpError, signUpData);
 
-        const details = [
-          signUpError?.message,
-          signUpError?.code ? `Code: ${signUpError.code}` : "",
-          signUpError?.status ? `Status: ${signUpError.status}` : "",
-        ].filter(Boolean);
+        if (signUpError?.code === "weak_password") {
+          setFehler(
+            "Das Kennwort ist zu schwach. Verwenden Sie mindestens einen Großbuchstaben, einen Kleinbuchstaben, eine Zahl und ein Sonderzeichen."
+          );
+        } else if (signUpError?.message?.toLowerCase().includes("already registered")) {
+          setFehler(
+            "Für diese E-Mail-Adresse besteht bereits ein Zugang. Bitte verwenden Sie den Vereinslogin oder „Kennwort vergessen?“."
+          );
+        } else {
+          setFehler(
+            "Die Registrierung konnte nicht abgeschlossen werden. Bitte prüfen Sie Ihre Angaben und versuchen Sie es erneut."
+          );
+        }
 
-        setFehler(
-          details.length
-            ? `Registrierung fehlgeschlagen: ${details.join(" · ")}`
-            : "Die Registrierung konnte nicht abgeschlossen werden. Supabase hat keinen Benutzer zurückgegeben."
-        );
         setLoading(false);
         return;
       }
@@ -80,15 +94,8 @@ export default function VereinRegistrierung() {
         console.error("Vereinsdatensatz konnte nicht gespeichert werden:", insertError);
         await supabase.auth.signOut();
 
-        const details = [
-          insertError?.message,
-          insertError?.code ? `Code: ${insertError.code}` : "",
-          insertError?.details ? `Details: ${insertError.details}` : "",
-          insertError?.hint ? `Hinweis: ${insertError.hint}` : "",
-        ].filter(Boolean);
-
         setFehler(
-          `Das Konto wurde erstellt, aber der Verein konnte nicht gespeichert werden.${details.length ? ` ${details.join(" · ")}` : ""}`
+          "Das Konto wurde erstellt, aber die Vereinsdaten konnten nicht gespeichert werden. Bitte wenden Sie sich an die Ligaleitung."
         );
         setLoading(false);
         return;
@@ -101,7 +108,7 @@ export default function VereinRegistrierung() {
     } catch (error) {
       console.error("Unerwarteter Registrierungsfehler:", error);
       setFehler(
-        `Bei der Registrierung ist ein unerwarteter Fehler aufgetreten.${error?.message ? ` ${error.message}` : ""}`
+        "Bei der Registrierung ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es erneut."
       );
     } finally {
       setLoading(false);
@@ -164,30 +171,55 @@ export default function VereinRegistrierung() {
             <label className="mb-1 block text-sm font-medium text-zinc-700">
               Kennwort
             </label>
-            <input
-              type="password"
-              placeholder="Kennwort"
-              value={passwort}
-              onChange={(event) => setKennwort(event.target.value)}
-              className="input"
-              autoComplete="new-password"
-              required
-            />
+            <div className="relative">
+              <input
+                type={kennwortSichtbar ? "text" : "password"}
+                placeholder="Kennwort"
+                value={passwort}
+                onChange={(event) => setKennwort(event.target.value)}
+                className="input pr-24"
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setKennwortSichtbar((sichtbar) => !sichtbar)}
+                className="absolute inset-y-0 right-3 flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                aria-label={kennwortSichtbar ? "Kennwort ausblenden" : "Kennwort anzeigen"}
+              >
+                {kennwortSichtbar ? "Ausblenden" : "Anzeigen"}
+              </button>
+            </div>
+
+            <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs leading-5 text-zinc-600">
+              <p className="font-medium text-zinc-700">Kennwort-Anforderungen:</p>
+              <p>Mindestens 8 Zeichen sowie je 1 Großbuchstabe, Kleinbuchstabe, Zahl und Sonderzeichen.</p>
+            </div>
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-700">
               Kennwort wiederholen
             </label>
-            <input
-              type="password"
-              placeholder="Kennwort wiederholen"
-              value={passwortWdh}
-              onChange={(event) => setKennwortWdh(event.target.value)}
-              className="input"
-              autoComplete="new-password"
-              required
-            />
+            <div className="relative">
+              <input
+                type={kennwortWdhSichtbar ? "text" : "password"}
+                placeholder="Kennwort wiederholen"
+                value={passwortWdh}
+                onChange={(event) => setKennwortWdh(event.target.value)}
+                className="input pr-24"
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setKennwortWdhSichtbar((sichtbar) => !sichtbar)}
+                className="absolute inset-y-0 right-3 flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                aria-label={kennwortWdhSichtbar ? "Kennwort ausblenden" : "Kennwort anzeigen"}
+              >
+                {kennwortWdhSichtbar ? "Ausblenden" : "Anzeigen"}
+              </button>
+            </div>
           </div>
 
           {meldung ? (
