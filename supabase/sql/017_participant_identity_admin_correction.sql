@@ -1,0 +1,9 @@
+-- Platzhalterdatei wird nicht verwendet. Die Migration wurde bereits direkt in Supabase angewendet.
+-- Dieser Repository-Eintrag dokumentiert nur den Funktionsumfang und darf nicht manuell ausgeführt werden.
+--
+-- Eingeführt wurden:
+-- 1. verein_ergebnisse.teilnehmer_id als feste Zuordnung zu verein_teilnehmer.id
+-- 2. Backfill der bestehenden Ergebniszeilen auf die eindeutigen Teilnehmer
+-- 3. Anpassung von save_verein_ergebnis für die feste Teilnehmerzuordnung
+-- 4. RPC admin_update_teilnehmer_stammdaten(...), die Name/Vorname/Altersklasse
+--    am bestehenden Teilnehmer ändert und vorhandene Ergebniszeilen synchron hält.
