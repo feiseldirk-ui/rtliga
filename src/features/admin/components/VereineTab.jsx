@@ -31,6 +31,18 @@ function withTimeout(promise, timeoutMs = 15000) {
   });
 }
 
+function formatAuditDate(value) {
+  if (!value) return "";
+  try {
+    return new Intl.DateTimeFormat("de-DE", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return String(value);
+  }
+}
+
 const VereineTab = ({ onRefreshStats }) => {
   const [vereine, setVereine] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,12 +52,40 @@ const VereineTab = ({ onRefreshStats }) => {
   const [nameSortOrder, setNameSortOrder] = useState("asc");
   const [ageFilter, setAgeFilter] = useState("Alle");
   const [loadError, setLoadError] = useState("");
+
   const [editingParticipantId, setEditingParticipantId] = useState(null);
-  const [editForm, setEditForm] = useState({ vorname: "", name: "", altersklasse: "" });
+  const [editForm, setEditForm] = useState({ vorname: "", name: "", altersklasse: "", bemerkung: "" });
   const [editSaving, setEditSaving] = useState(false);
   const [editMessage, setEditMessage] = useState("");
   const [editError, setEditError] = useState("");
+
+  const [editingClubId, setEditingClubId] = useState(null);
+  const [clubForm, setClubForm] = useState({ vereinsname: "", bemerkung: "" });
+  const [clubSaving, setClubSaving] = useState(false);
+
+  const [auditRows, setAuditRows] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState("");
+  const [auditOpen, setAuditOpen] = useState(false);
+
   const requestIdRef = useRef(0);
+
+  const fetchAuditLog = React.useCallback(async () => {
+    setAuditLoading(true);
+    setAuditError("");
+    try {
+      const { data, error } = await withTimeout(
+        supabase.rpc("list_admin_audit_log", { p_limit: 100 }),
+      );
+      if (error) throw error;
+      setAuditRows(data || []);
+    } catch (error) {
+      console.error("Änderungsverlauf konnte nicht geladen werden:", error);
+      setAuditError("Änderungsverlauf konnte nicht geladen werden.");
+    } finally {
+      setAuditLoading(false);
+    }
+  }, []);
 
   const fetchVereine = React.useCallback(async () => {
     const requestId = requestIdRef.current + 1;
@@ -115,7 +155,10 @@ const VereineTab = ({ onRefreshStats }) => {
   useEffect(() => {
     const handleAdminRefresh = () => fetchVereine();
     window.addEventListener("rtliga-admin-refresh", handleAdminRefresh);
-    const unsubscribe = subscribeToTables({ tables: ["vereine", "verein_teilnehmer", "verein_ergebnisse"], onChange: fetchVereine });
+    const unsubscribe = subscribeToTables({
+      tables: ["vereine", "verein_teilnehmer", "verein_ergebnisse"],
+      onChange: fetchVereine,
+    });
     return () => {
       window.removeEventListener("rtliga-admin-refresh", handleAdminRefresh);
       unsubscribe?.();
@@ -177,6 +220,7 @@ const VereineTab = ({ onRefreshStats }) => {
       vorname: teilnehmer.vorname || "",
       name: teilnehmer.name || "",
       altersklasse: teilnehmer.altersklasse || "",
+      bemerkung: "",
     });
     setEditMessage("");
     setEditError("");
@@ -184,7 +228,7 @@ const VereineTab = ({ onRefreshStats }) => {
 
   const cancelEditParticipant = () => {
     setEditingParticipantId(null);
-    setEditForm({ vorname: "", name: "", altersklasse: "" });
+    setEditForm({ vorname: "", name: "", altersklasse: "", bemerkung: "" });
     setEditError("");
   };
 
@@ -192,9 +236,14 @@ const VereineTab = ({ onRefreshStats }) => {
     const vorname = editForm.vorname.trim();
     const name = editForm.name.trim();
     const altersklasse = editForm.altersklasse.trim();
+    const bemerkung = editForm.bemerkung.trim();
 
     if (!vorname || !name || !altersklasse) {
       setEditError("Vorname, Nachname und Altersklasse müssen ausgefüllt sein.");
+      return;
+    }
+    if (!bemerkung) {
+      setEditError("Bitte eine Bemerkung bzw. den Grund der Änderung eintragen.");
       return;
     }
 
@@ -204,14 +253,13 @@ const VereineTab = ({ onRefreshStats }) => {
       altersklasse === String(teilnehmer.altersklasse || "").trim();
 
     if (unchanged) {
-      setEditingParticipantId(null);
+      setEditError("Es wurde keine fachliche Änderung vorgenommen.");
       return;
     }
 
     const confirmed = window.confirm(
-      `Teilnehmerdaten wirklich ändern?\n\n${teilnehmer.vorname} ${teilnehmer.name} (${teilnehmer.altersklasse || "ohne Klasse"})\n→\n${vorname} ${name} (${altersklasse})\n\nVorhandene Ergebnisse bleiben bestehen und werden demselben Teilnehmer zugeordnet.`
+      `Teilnehmerdaten wirklich ändern?\n\n${teilnehmer.vorname} ${teilnehmer.name} (${teilnehmer.altersklasse || "ohne Klasse"})\n→\n${vorname} ${name} (${altersklasse})\n\nGrund: ${bemerkung}\n\nVorhandene Ergebnisse bleiben demselben Teilnehmer zugeordnet.`
     );
-
     if (!confirmed) return;
 
     setEditSaving(true);
@@ -224,14 +272,15 @@ const VereineTab = ({ onRefreshStats }) => {
         p_vorname: vorname,
         p_nachname: name,
         p_altersklasse: altersklasse,
+        p_bemerkung: bemerkung,
       });
-
       if (error) throw error;
 
       await loadTeilnehmer(teilnehmer.verein_id);
       setEditingParticipantId(null);
-      setEditForm({ vorname: "", name: "", altersklasse: "" });
-      setEditMessage(`Teilnehmerdaten von ${vorname} ${name} wurden aktualisiert. Vorhandene Ergebnisse bleiben zugeordnet.`);
+      setEditForm({ vorname: "", name: "", altersklasse: "", bemerkung: "" });
+      setEditMessage(`Teilnehmerdaten von ${vorname} ${name} wurden aktualisiert und protokolliert.`);
+      await fetchAuditLog();
       if (typeof onRefreshStats === "function") onRefreshStats();
       window.dispatchEvent(new CustomEvent("rtliga-admin-refresh"));
     } catch (error) {
@@ -239,6 +288,66 @@ const VereineTab = ({ onRefreshStats }) => {
       setEditError("Die Teilnehmerdaten konnten nicht gespeichert werden. Bitte Admin-Sitzung prüfen und erneut versuchen.");
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const beginEditClub = (verein) => {
+    setEditingClubId(verein.id);
+    setClubForm({ vereinsname: verein.vereinsname || "", bemerkung: "" });
+    setEditMessage("");
+    setEditError("");
+  };
+
+  const cancelEditClub = () => {
+    setEditingClubId(null);
+    setClubForm({ vereinsname: "", bemerkung: "" });
+    setEditError("");
+  };
+
+  const saveClubCorrection = async (verein) => {
+    const vereinsname = clubForm.vereinsname.trim();
+    const bemerkung = clubForm.bemerkung.trim();
+
+    if (!vereinsname) {
+      setEditError("Der Vereinsname muss ausgefüllt sein.");
+      return;
+    }
+    if (!bemerkung) {
+      setEditError("Bitte eine Bemerkung bzw. den Grund der Änderung eintragen.");
+      return;
+    }
+    if (vereinsname === String(verein.vereinsname || "").trim()) {
+      setEditError("Der Vereinsname wurde nicht geändert.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Vereinsname wirklich ändern?\n\n${verein.vereinsname}\n→\n${vereinsname}\n\nGrund: ${bemerkung}\n\nLogin-Daten werden nicht verändert. Teilnehmer und vorhandene Ergebnisse bleiben demselben Verein zugeordnet.`
+    );
+    if (!confirmed) return;
+
+    setClubSaving(true);
+    setEditError("");
+    setEditMessage("");
+    try {
+      const { error } = await supabase.rpc("admin_update_verein_stammdaten", {
+        p_verein_id: verein.id,
+        p_vereinsname: vereinsname,
+        p_bemerkung: bemerkung,
+      });
+      if (error) throw error;
+
+      setEditingClubId(null);
+      setClubForm({ vereinsname: "", bemerkung: "" });
+      setEditMessage(`Vereinsname wurde in „${vereinsname}“ geändert und protokolliert.`);
+      await Promise.all([fetchVereine(), fetchAuditLog()]);
+      if (offenVereinId === verein.id) await loadTeilnehmer(verein.id);
+      window.dispatchEvent(new CustomEvent("rtliga-admin-refresh"));
+    } catch (error) {
+      console.error("Vereinskorrektur fehlgeschlagen:", error);
+      setEditError("Der Vereinsname konnte nicht gespeichert werden. Bitte prüfen, ob der Name bereits verwendet wird.");
+    } finally {
+      setClubSaving(false);
     }
   };
 
@@ -311,16 +420,12 @@ const VereineTab = ({ onRefreshStats }) => {
             </div>
           </div>
 
-          {editMessage ? (
-            <div className="mx-5 mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{editMessage}</div>
-          ) : null}
-          {editError ? (
-            <div className="mx-5 mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{editError}</div>
-          ) : null}
+          {editMessage ? <div className="mx-5 mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{editMessage}</div> : null}
+          {editError ? <div className="mx-5 mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{editError}</div> : null}
 
           {offeneTeilnehmer.length > 0 ? (
             <div className="table-wrap rounded-none border-0 shadow-none">
-              <table className="table min-w-[760px]">
+              <table className="table min-w-[820px]">
                 <thead>
                   <tr>
                     <th>Vorname</th>
@@ -338,43 +443,54 @@ const VereineTab = ({ onRefreshStats }) => {
                   {sichtbareTeilnehmer.map((t) => {
                     const editing = editingParticipantId === t.id;
                     return (
-                      <tr key={t.id}>
-                        <td className="font-medium text-zinc-900">
-                          {editing ? (
-                            <input className="input min-w-[150px]" value={editForm.vorname} onChange={(event) => setEditForm((prev) => ({ ...prev, vorname: event.target.value }))} />
-                          ) : t.vorname}
-                        </td>
-                        <td>
-                          {editing ? (
-                            <input className="input min-w-[170px]" value={editForm.name} onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))} />
-                          ) : t.name}
-                        </td>
-                        <td>
-                          {editing ? (
-                            <select className="input min-w-[170px]" value={editForm.altersklasse} onChange={(event) => setEditForm((prev) => ({ ...prev, altersklasse: event.target.value }))}>
-                              <option value="">Altersklasse wählen</option>
-                              {editAgeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                            </select>
-                          ) : (
-                            <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">{t.altersklasse}</span>
-                          )}
-                        </td>
-                        <td className="text-right">
-                          {editing ? (
-                            <div className="flex justify-end gap-2">
-                              <button type="button" className="btn btn-primary" onClick={() => saveParticipantCorrection(t)} disabled={editSaving}>{editSaving ? "Speichert…" : "Speichern"}</button>
-                              <button type="button" className="btn btn-secondary" onClick={cancelEditParticipant} disabled={editSaving}>Abbrechen</button>
-                            </div>
-                          ) : (
-                            <button type="button" className="btn btn-secondary" onClick={() => beginEditParticipant(t)} disabled={editSaving}>Bearbeiten</button>
-                          )}
-                        </td>
-                      </tr>
+                      <React.Fragment key={t.id}>
+                        <tr>
+                          <td className="font-medium text-zinc-900">
+                            {editing ? <input className="input min-w-[150px]" value={editForm.vorname} onChange={(event) => setEditForm((prev) => ({ ...prev, vorname: event.target.value }))} /> : t.vorname}
+                          </td>
+                          <td>
+                            {editing ? <input className="input min-w-[170px]" value={editForm.name} onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))} /> : t.name}
+                          </td>
+                          <td>
+                            {editing ? (
+                              <select className="input min-w-[170px]" value={editForm.altersklasse} onChange={(event) => setEditForm((prev) => ({ ...prev, altersklasse: event.target.value }))}>
+                                <option value="">Altersklasse wählen</option>
+                                {editAgeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                              </select>
+                            ) : (
+                              <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">{t.altersklasse}</span>
+                            )}
+                          </td>
+                          <td className="text-right">
+                            {editing ? (
+                              <div className="flex justify-end gap-2">
+                                <button type="button" className="btn btn-primary" onClick={() => saveParticipantCorrection(t)} disabled={editSaving}>{editSaving ? "Speichert…" : "Speichern"}</button>
+                                <button type="button" className="btn btn-secondary" onClick={cancelEditParticipant} disabled={editSaving}>Abbrechen</button>
+                              </div>
+                            ) : (
+                              <button type="button" className="btn btn-secondary" onClick={() => beginEditParticipant(t)} disabled={editSaving || clubSaving}>Bearbeiten</button>
+                            )}
+                          </td>
+                        </tr>
+                        {editing ? (
+                          <tr>
+                            <td colSpan={4} className="bg-indigo-50/40 px-4 py-4">
+                              <label className="block text-sm font-semibold text-zinc-700">Bemerkung / Grund der Änderung *</label>
+                              <textarea
+                                className="input mt-2 min-h-[86px] w-full resize-y"
+                                value={editForm.bemerkung}
+                                onChange={(event) => setEditForm((prev) => ({ ...prev, bemerkung: event.target.value }))}
+                                placeholder="z. B. Schreibfehler laut Rückmeldung des Vereins korrigiert"
+                                maxLength={500}
+                              />
+                              <p className="mt-1 text-xs text-zinc-500">Pflichtfeld. Wird zusammen mit altem und neuem Wert im Änderungsverlauf gespeichert.</p>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </React.Fragment>
                     );
                   })}
-                  {sichtbareTeilnehmer.length === 0 ? (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-zinc-500">Keine Teilnehmer für diesen Filter gefunden.</td></tr>
-                  ) : null}
+                  {sichtbareTeilnehmer.length === 0 ? <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-zinc-500">Keine Teilnehmer für diesen Filter gefunden.</td></tr> : null}
                 </tbody>
               </table>
             </div>
@@ -382,7 +498,6 @@ const VereineTab = ({ onRefreshStats }) => {
             <div className="rounded-b-3xl border-t border-zinc-200 bg-white px-5 py-8 text-center shadow-sm">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 text-xl text-zinc-500">∅</div>
               <p className="mt-4 text-sm font-medium text-zinc-700">Für diesen Verein sind aktuell noch keine Teilnehmer hinterlegt.</p>
-              <p className="mt-1 text-sm text-zinc-500">Die Vereinskarte bleibt trotzdem direkt im Dashboard sichtbar.</p>
             </div>
           )}
         </div>
@@ -391,42 +506,116 @@ const VereineTab = ({ onRefreshStats }) => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-zinc-900">Alle Vereine</h2>
-          <p className="mt-1 text-sm text-zinc-600">Klick auf einen Verein, um die gemeldeten Teilnehmer anzuzeigen und bei Bedarf als Admin zu korrigieren.</p>
+          <p className="mt-1 text-sm text-zinc-600">Teilnehmer und fachliche Vereinsnamen können durch Admins korrigiert werden. Login-Daten bleiben unverändert.</p>
         </div>
         <div className="rounded-2xl border border-zinc-200 bg-gradient-to-r from-white to-zinc-50 px-4 py-3 text-sm text-zinc-600 shadow-sm">
           <span className="font-semibold text-zinc-900">{vereine.length}</span> Vereine geladen
         </div>
       </div>
 
+      {editError && !offenerVerein ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{editError}</div> : null}
+      {editMessage && !offenerVerein ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{editMessage}</div> : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {vereine.map((verein) => {
           const istOffen = offenVereinId === verein.id;
           const count = teilnehmerCounts[verein.id] || 0;
+          const clubEditing = editingClubId === verein.id;
 
           return (
-            <div key={verein.id} className={`overflow-hidden rounded-3xl border bg-white transition-all duration-200 ${istOffen ? "border-indigo-200 shadow-[0_14px_34px_rgba(79,70,229,0.10)]" : "border-zinc-200 shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:border-zinc-300 hover:shadow-[0_12px_28px_rgba(16,24,40,0.08)]"}`}>
-              <button type="button" className="flex h-full w-full flex-col gap-4 px-5 py-5 text-left transition-colors hover:bg-zinc-50/70 sm:px-6" onClick={() => toggleTeilnehmer(verein.id)}>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-bold text-white shadow-sm">
-                      {(verein.vereinsname || "V").split(" ").slice(0, 2).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="truncate text-xl font-semibold text-zinc-900">{verein.vereinsname}</div>
-                      <div className="mt-1 truncate text-sm text-zinc-500">{verein.email || "Keine E-Mail hinterlegt"}</div>
-                    </div>
+            <div key={verein.id} className={`overflow-hidden rounded-3xl border bg-white transition-all duration-200 ${istOffen ? "border-indigo-200 shadow-[0_14px_34px_rgba(79,70,229,0.10)]" : "border-zinc-200 shadow-sm"}`}>
+              {clubEditing ? (
+                <div className="space-y-4 p-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-zinc-700">Vereinsname</label>
+                    <input className="input mt-2 w-full" value={clubForm.vereinsname} onChange={(event) => setClubForm((prev) => ({ ...prev, vereinsname: event.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-zinc-700">Bemerkung / Grund der Änderung *</label>
+                    <textarea className="input mt-2 min-h-[92px] w-full resize-y" value={clubForm.bemerkung} onChange={(event) => setClubForm((prev) => ({ ...prev, bemerkung: event.target.value }))} placeholder="Warum wird der Vereinsname korrigiert?" maxLength={500} />
+                  </div>
+                  <div className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700">Login-E-Mail, Kennwort, Auth-Benutzer und Benutzer-ID werden nicht verändert.</div>
+                  <div className="flex gap-2">
+                    <button type="button" className="btn btn-primary" onClick={() => saveClubCorrection(verein)} disabled={clubSaving}>{clubSaving ? "Speichert…" : "Speichern"}</button>
+                    <button type="button" className="btn btn-secondary" onClick={cancelEditClub} disabled={clubSaving}>Abbrechen</button>
                   </div>
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-4">
-                  <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getTeilnehmerBadgeClass(count)}`}>{count} Teilnehmer</span>
-                  <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-600">{getStatusText(count)}</span>
-                  <span className="ml-auto text-sm font-semibold text-indigo-600">{istOffen ? "Schließen" : "Teilnehmer anzeigen"}</span>
-                </div>
-              </button>
+              ) : (
+                <>
+                  <button type="button" className="flex w-full flex-col gap-4 px-5 py-5 text-left transition-colors hover:bg-zinc-50/70 sm:px-6" onClick={() => toggleTeilnehmer(verein.id)}>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-bold text-white shadow-sm">
+                        {(verein.vereinsname || "V").split(" ").slice(0, 2).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-xl font-semibold text-zinc-900">{verein.vereinsname}</div>
+                        <div className="mt-1 truncate text-sm text-zinc-500">{verein.email || "Keine E-Mail hinterlegt"}</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-4">
+                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getTeilnehmerBadgeClass(count)}`}>{count} Teilnehmer</span>
+                      <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-600">{getStatusText(count)}</span>
+                      <span className="ml-auto text-sm font-semibold text-indigo-600">{istOffen ? "Schließen" : "Teilnehmer anzeigen"}</span>
+                    </div>
+                  </button>
+                  <div className="border-t border-zinc-100 px-5 py-3">
+                    <button type="button" className="btn btn-secondary w-full" onClick={() => beginEditClub(verein)} disabled={editSaving || clubSaving}>Vereinsname korrigieren</button>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
+      </div>
+
+      <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-zinc-200 bg-zinc-50/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-zinc-900">Änderungsverlauf</h3>
+            <p className="mt-1 text-sm text-zinc-600">Protokollierte Admin-Korrekturen mit altem Wert, neuem Wert und Begründung.</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" className="btn btn-secondary" onClick={fetchAuditLog} disabled={auditLoading}>{auditLoading ? "Lädt…" : "Aktualisieren"}</button>
+            <button type="button" className="btn btn-secondary" onClick={async () => { const next = !auditOpen; setAuditOpen(next); if (next && auditRows.length === 0) await fetchAuditLog(); }}>{auditOpen ? "Schließen" : "Anzeigen"}</button>
+          </div>
+        </div>
+
+        {auditOpen ? (
+          <div className="p-5">
+            {auditError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{auditError}</div> : null}
+            {!auditLoading && auditRows.length === 0 && !auditError ? <p className="text-sm text-zinc-500">Noch keine protokollierten Änderungen vorhanden.</p> : null}
+            {auditRows.length > 0 ? (
+              <div className="overflow-x-auto rounded-2xl border border-zinc-200">
+                <table className="min-w-[940px] w-full text-sm">
+                  <thead className="bg-zinc-50 text-left text-zinc-600">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Zeitpunkt</th>
+                      <th className="px-4 py-3 font-semibold">Bereich</th>
+                      <th className="px-4 py-3 font-semibold">Feld</th>
+                      <th className="px-4 py-3 font-semibold">Alt</th>
+                      <th className="px-4 py-3 font-semibold">Neu</th>
+                      <th className="px-4 py-3 font-semibold">Bemerkung</th>
+                      <th className="px-4 py-3 font-semibold">Admin</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200">
+                    {auditRows.map((row) => (
+                      <tr key={row.id} className="align-top">
+                        <td className="whitespace-nowrap px-4 py-3 text-zinc-600">{formatAuditDate(row.created_at)}</td>
+                        <td className="px-4 py-3"><span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs font-semibold">{row.entity_type === "teilnehmer" ? `Teilnehmer #${row.teilnehmer_id}` : "Verein"}</span></td>
+                        <td className="px-4 py-3 font-medium text-zinc-800">{row.field_name}</td>
+                        <td className="px-4 py-3 text-zinc-600">{row.old_value || "–"}</td>
+                        <td className="px-4 py-3 font-medium text-zinc-900">{row.new_value || "–"}</td>
+                        <td className="max-w-[320px] whitespace-normal px-4 py-3 text-zinc-700">{row.bemerkung}</td>
+                        <td className="px-4 py-3 text-zinc-600">{row.admin_email || "Admin"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
