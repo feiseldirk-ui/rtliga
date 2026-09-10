@@ -49,7 +49,19 @@ export default function VereinRegistrierung() {
       });
 
       if (signUpError || !signUpData?.user?.id) {
-        setFehler("Die Registrierung konnte nicht abgeschlossen werden.");
+        console.error("Supabase signUp fehlgeschlagen:", signUpError, signUpData);
+
+        const details = [
+          signUpError?.message,
+          signUpError?.code ? `Code: ${signUpError.code}` : "",
+          signUpError?.status ? `Status: ${signUpError.status}` : "",
+        ].filter(Boolean);
+
+        setFehler(
+          details.length
+            ? `Registrierung fehlgeschlagen: ${details.join(" · ")}`
+            : "Die Registrierung konnte nicht abgeschlossen werden. Supabase hat keinen Benutzer zurückgegeben."
+        );
         setLoading(false);
         return;
       }
@@ -65,9 +77,18 @@ export default function VereinRegistrierung() {
       const { error: insertError } = await supabase.from("vereine").insert(vereinPayload);
 
       if (insertError) {
+        console.error("Vereinsdatensatz konnte nicht gespeichert werden:", insertError);
         await supabase.auth.signOut();
+
+        const details = [
+          insertError?.message,
+          insertError?.code ? `Code: ${insertError.code}` : "",
+          insertError?.details ? `Details: ${insertError.details}` : "",
+          insertError?.hint ? `Hinweis: ${insertError.hint}` : "",
+        ].filter(Boolean);
+
         setFehler(
-          "Das Konto wurde erstellt, aber der Verein konnte nicht gespeichert werden. Bitte prüfen Sie die Supabase-SQL aus dem Projektordner."
+          `Das Konto wurde erstellt, aber der Verein konnte nicht gespeichert werden.${details.length ? ` ${details.join(" · ")}` : ""}`
         );
         setLoading(false);
         return;
@@ -77,8 +98,11 @@ export default function VereinRegistrierung() {
         "Registrierung erfolgreich. Sie können sich jetzt mit Ihrer Vereins-E-Mail anmelden."
       );
       setTimeout(() => navigate("/login"), 1600);
-    } catch {
-      setFehler("Bei der Registrierung ist ein unerwarteter Fehler aufgetreten.");
+    } catch (error) {
+      console.error("Unerwarteter Registrierungsfehler:", error);
+      setFehler(
+        `Bei der Registrierung ist ein unerwarteter Fehler aufgetreten.${error?.message ? ` ${error.message}` : ""}`
+      );
     } finally {
       setLoading(false);
     }
