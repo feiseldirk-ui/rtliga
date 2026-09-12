@@ -132,7 +132,7 @@ export default function HomePage() {
         <header className="relative overflow-hidden border-b border-zinc-200 px-6 py-9 text-center sm:px-10 sm:py-12">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(59,130,246,0.12),transparent_30%),radial-gradient(circle_at_88%_20%,rgba(16,185,129,0.10),transparent_32%)]" />
           <div className="relative flex flex-col items-center">
-            <BrandMark className="h-20 w-[190px]" />
+            <BrandMark className="h-auto w-full max-w-[340px]" />
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               RTLiga Verwaltung
             </h1>

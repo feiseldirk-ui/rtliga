@@ -12,6 +12,7 @@ import RundenprotokollTab from "./RundenprotokollTab";
 import AdminManagementTab from "./AdminManagementTab";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
 import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
+import BrandMark from "../../../shared/ui/BrandMark";
 
 const INITIAL_STATS = {
   vereine: 0,
@@ -102,9 +103,7 @@ function AdminDashboard({ adminEmail, logout }) {
           {/* Zeile 1: Identity + Media-Chips + Stats + Logout */}
           <div className="flex items-center justify-between gap-3 py-2 border-b border-zinc-100">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
-                <span className="text-xs font-bold">A</span>
-              </div>
+              <BrandMark className="h-auto w-[92px] shrink-0 sm:w-32" />
               <span className="text-sm font-semibold text-zinc-900 truncate hidden sm:block">RTLiga Admin</span>
               <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 truncate max-w-[160px]">
                 {adminEmail || "unbekannt"}

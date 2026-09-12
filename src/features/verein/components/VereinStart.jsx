@@ -12,6 +12,7 @@ import { endClubSession } from "../../../lib/clubSessionCore";
 import TeilnehmerPanel from "../../../shared/ui/dashboard/TeilnehmerPanel";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
 import WkTimeWindowsModal from "../../../shared/ui/WkTimeWindowsModal";
+import BrandMark from "../../../shared/ui/BrandMark";
 
 import VereinErgebnisseEintragen from "./VereinErgebnisseEintragen";
 import VereinErgebnisseAnzeigen from "./VereinErgebnisseAnzeigen";
@@ -503,11 +504,7 @@ export default function VereinStart() {
 
             {/* Links: Vereinsname */}
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">
-                <span className="text-xs font-bold leading-none">
-                  {(verein.vereinsname || "V").slice(0, 2).toUpperCase()}
-                </span>
-              </div>
+              <BrandMark className="h-auto w-[92px] shrink-0 sm:w-32" />
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-500 leading-none">Vereinsbereich</p>
                 <h1 className="text-base font-bold text-zinc-900 truncate leading-tight mt-0.5">{verein.vereinsname}</h1>

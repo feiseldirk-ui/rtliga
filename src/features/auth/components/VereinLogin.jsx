@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { logError } from "../../../lib/logger";
 import { writeVereinSession } from "../../../lib/storage/vereinSession";
 import { loginClub } from "../../../lib/vereinSessionLock";
+import BrandMark from "../../../shared/ui/BrandMark";
 
 export default function VereinLogin({ onLoginErfolg }) {
   const navigate = useNavigate();
@@ -48,6 +49,7 @@ export default function VereinLogin({ onLoginErfolg }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
       <div className="card w-full max-w-md p-8 animate-fade-in">
+        <BrandMark className="mx-auto mb-6 h-auto w-full max-w-[300px]" />
         <div className="mb-6 flex items-center justify-between gap-3">
           <h2 className="text-xl font-extrabold text-zinc-900">Vereinslogin</h2>
           <button className="btn btn-secondary" onClick={() => navigate("/")}>

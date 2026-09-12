@@ -5,6 +5,7 @@ import { createClubSessionMonitor, sessionIdentity } from '../../../lib/clubSess
 import { adminSessionMessage } from '../../../lib/adminSessionCore';
 import { adminSessionApi, adminLogin, readAdminIdentity, writeAdminIdentity } from '../../../lib/adminSession';
 import AppDialog from '../../../shared/ui/AppDialog';
+import BrandMark from '../../../shared/ui/BrandMark';
 
 export default function AdminSessionGate({ children }) {
   const navigate = useNavigate();
@@ -101,6 +102,9 @@ export default function AdminSessionGate({ children }) {
   if (!record) return <div className="mx-auto max-w-3xl px-4 py-10">
     <div className="card overflow-hidden">
       <div className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 px-6 py-8 text-white">
+        <div className="mb-6 inline-flex rounded-2xl bg-white/95 p-2 shadow-sm">
+          <BrandMark className="h-auto w-64 max-w-full" />
+        </div>
         <p className="text-sm uppercase tracking-widest">RTLiga Verwaltung</p>
         <h1 className="mt-3 text-3xl font-semibold">Admin-Anmeldung</h1>
         <p className="mt-3 text-sm">Pro Admin-Konto ist eine Sitzung erlaubt. Die erste Anmeldung bleibt aktiv.</p>

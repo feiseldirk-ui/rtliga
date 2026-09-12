@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import supabase from "../../../lib/supabase/client";
+import BrandMark from "../../../shared/ui/BrandMark";
 
 function getResetRedirectUrl(context, email) {
   const params = new URLSearchParams();
@@ -72,6 +73,7 @@ export default function KennwortVergessen() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="card w-full max-w-md animate-fade-in">
+        <BrandMark className="mx-auto mb-5 h-auto w-full max-w-[280px]" />
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold text-zinc-900">Kennwort vergessen</h2>
           <button className="btn btn-secondary" onClick={() => navigate(backTarget)}>

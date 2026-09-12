@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../../lib/supabase/client";
+import BrandMark from "../../../shared/ui/BrandMark";
 
 const ADMIN_ACCESS_FLAG_KEY = "rtliga_admin_access_verified";
 const ADMIN_LOGOUT_REDIRECT_KEY = "rtliga_admin_logout_redirect";
@@ -268,6 +269,7 @@ export default function KennwortZuruecksetzen() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="card w-full max-w-md animate-fade-in">
+        <BrandMark className="mx-auto mb-5 h-auto w-full max-w-[280px]" />
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold text-zinc-900">
             Neues Kennwort setzen

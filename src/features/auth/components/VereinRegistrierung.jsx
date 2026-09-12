@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../../../lib/supabase/client";
+import BrandMark from "../../../shared/ui/BrandMark";
 
 export default function VereinRegistrierung() {
   const navigate = useNavigate();
@@ -118,6 +119,7 @@ export default function VereinRegistrierung() {
   return (
     <div className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6 lg:px-8">
       <div className="card w-full max-w-md animate-fade-in p-5 sm:p-6">
+        <BrandMark className="mx-auto mb-5 h-auto w-full max-w-[280px]" />
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold text-zinc-900">Verein registrieren</h2>
           <button className="btn btn-secondary" onClick={() => navigate("/")}>

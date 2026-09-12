@@ -353,7 +353,7 @@ export default function PublicResultsPage() {
         <header className="rounded-3xl border border-white/80 bg-white/95 px-4 py-4 shadow-sm backdrop-blur sm:px-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <button type="button" onClick={() => navigate("/")} className="flex items-center gap-3 text-left">
-              <BrandMark className="h-12 w-32" />
+              <BrandMark className="h-auto w-40 shrink-0 sm:w-52" />
               <div className="hidden sm:block">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Öffentlicher Bereich</p>
                 <p className="font-bold text-zinc-900">RTLiga Ergebnisse</p>

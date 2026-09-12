@@ -11,6 +11,7 @@ import VereinSessionGate from "./features/auth/components/VereinSessionGate";
 import IdleSessionGuard from "./features/auth/components/IdleSessionGuard";
 import HomePage from "./features/public/components/HomePage";
 import PublicResultsPage from "./features/public/components/PublicResultsPage";
+import { applyDocumentBranding, getBrandYear } from "./lib/branding";
 import { logError } from "./lib/logger";
 import {
   clearVereinSession,
@@ -36,6 +37,13 @@ function AdminRoute() {
 export default function App() {
   const [verein, setVerein] = useState(null);
   const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const refreshBranding = () => applyDocumentBranding(document, getBrandYear());
+    refreshBranding();
+    const timer = window.setInterval(refreshBranding, 60 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
