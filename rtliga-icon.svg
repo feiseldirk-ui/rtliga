@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <rect width="180" height="180" rx="34" fill="#fff"/>
+  <path d="M15 12h150l-9 156H24z" fill="#fff" stroke="#202020" stroke-width="4"/>
+  <text x="90" y="60" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="29" font-style="italic" font-weight="800" fill="#111827">Online-Liga</text>
+  <circle cx="38" cy="91" r="13" fill="#f4f4f5" stroke="#a1a1aa" stroke-width="3"/>
+  <circle cx="38" cy="91" r="4" fill="#d4d4d8"/>
+  <circle cx="142" cy="91" r="13" fill="#f4f4f5" stroke="#a1a1aa" stroke-width="3"/>
+  <circle cx="142" cy="91" r="4" fill="#d4d4d8"/>
+  <text x="90" y="139" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="16" font-style="italic" font-weight="800" fill="#ffd91a" stroke="#d69b00" stroke-width="0.8">Laufende Scheibe</text>
+</svg>
