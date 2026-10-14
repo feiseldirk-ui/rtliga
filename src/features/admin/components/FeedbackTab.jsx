@@ -8,6 +8,7 @@ import {
   FEEDBACK_STATUS_LABELS,
   formatFeedbackForHandoff,
 } from "../../../lib/feedback";
+import AppChoiceField from "../../../shared/ui/AppChoiceField";
 
 const STATUS_STYLE = {
   neu: "border-sky-200 bg-sky-50 text-sky-700",
@@ -22,6 +23,19 @@ const CATEGORY_LABELS = {
   verbesserung: "Verbesserung",
   hinweis: "Hinweis",
 };
+
+const FILTER_OPTIONS = [
+  { value: "offen", label: "Offene Meldungen" },
+  { value: "neu", label: "Nur neue" },
+  { value: "in_pruefung", label: "In Prüfung" },
+  { value: "vorgesehen", label: "Vorgesehen" },
+  { value: "erledigt", label: "Erledigt" },
+  { value: "abgelehnt", label: "Abgelehnt" },
+  { value: "alle", label: "Alle Meldungen" },
+];
+
+const STATUS_OPTIONS = FEEDBACK_STATUS.map((status) => ({ value: status, label: FEEDBACK_STATUS_LABELS[status] }));
+const PRIORITY_OPTIONS = FEEDBACK_PRIORITIES.map((priority) => ({ value: priority, label: FEEDBACK_PRIORITY_LABELS[priority] }));
 
 function formatDate(value) {
   return new Intl.DateTimeFormat("de-DE", {
@@ -144,18 +158,13 @@ export default function FeedbackTab() {
           <button type="button" className="btn btn-secondary" onClick={loadReports} disabled={loading}>Aktualisieren</button>
         </div>
 
-        <label className="mt-4 block text-sm font-semibold text-zinc-700">
-          Anzeige
-          <select className="input mt-2" value={filter} onChange={(event) => setFilter(event.target.value)}>
-            <option value="offen">Offene Meldungen</option>
-            <option value="neu">Nur neue</option>
-            <option value="in_pruefung">In Prüfung</option>
-            <option value="vorgesehen">Vorgesehen</option>
-            <option value="erledigt">Erledigt</option>
-            <option value="abgelehnt">Abgelehnt</option>
-            <option value="alle">Alle Meldungen</option>
-          </select>
-        </label>
+        <AppChoiceField
+          className="mt-4"
+          label="Anzeige"
+          value={filter}
+          options={FILTER_OPTIONS}
+          onChange={setFilter}
+        />
 
         {loading && <p className="mt-5 text-sm text-zinc-500">Meldungen werden geladen…</p>}
         {!loading && filteredReports.length === 0 && <p className="mt-5 rounded-2xl bg-white p-4 text-sm text-zinc-500">Für diesen Filter sind keine Meldungen vorhanden.</p>}
@@ -234,16 +243,18 @@ export default function FeedbackTab() {
             </details>
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-semibold text-zinc-800">Status
-                <select className="input mt-2" value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))}>
-                  {FEEDBACK_STATUS.map((status) => <option key={status} value={status}>{FEEDBACK_STATUS_LABELS[status]}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-semibold text-zinc-800">Priorität
-                <select className="input mt-2" value={draft.priority} onChange={(event) => setDraft((current) => ({ ...current, priority: event.target.value }))}>
-                  {FEEDBACK_PRIORITIES.map((priority) => <option key={priority} value={priority}>{FEEDBACK_PRIORITY_LABELS[priority]}</option>)}
-                </select>
-              </label>
+              <AppChoiceField
+                label="Status"
+                value={draft.status}
+                options={STATUS_OPTIONS}
+                onChange={(status) => setDraft((current) => ({ ...current, status }))}
+              />
+              <AppChoiceField
+                label="Priorität"
+                value={draft.priority}
+                options={PRIORITY_OPTIONS}
+                onChange={(priority) => setDraft((current) => ({ ...current, priority }))}
+              />
             </div>
 
             <label className="mt-4 block text-sm font-semibold text-zinc-800">Adminnotiz oder Antwort an den Verein

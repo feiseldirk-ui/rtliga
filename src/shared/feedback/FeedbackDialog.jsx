@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../lib/supabase/client";
 import {
   createFeedbackStoragePath,
@@ -8,6 +8,7 @@ import {
   validateFeedbackDraft,
 } from "../../lib/feedback";
 import AppDialog from "../ui/AppDialog";
+import AppChoiceField from "../ui/AppChoiceField";
 
 const EMPTY_FORM = {
   category: "fehler",
@@ -25,6 +26,14 @@ const STATUS_STYLE = {
   abgelehnt: "border-zinc-200 bg-zinc-100 text-zinc-700",
 };
 
+const CATEGORY_OPTIONS = [
+  { value: "fehler", label: "Fehler" },
+  { value: "verbesserung", label: "Verbesserungsvorschlag" },
+  { value: "hinweis", label: "Allgemeiner Hinweis" },
+];
+
+const AREA_OPTIONS = FEEDBACK_AREA_OPTIONS.map((option) => ({ value: option, label: option }));
+
 function formatDate(value) {
   if (!value) return "";
   return new Intl.DateTimeFormat("de-DE", {
@@ -34,6 +43,7 @@ function formatDate(value) {
 }
 
 export default function FeedbackDialog({ open, onClose, verein, area }) {
+  const screenshotInputRef = useRef(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(false);
@@ -137,6 +147,7 @@ export default function FeedbackDialog({ open, onClose, verein, area }) {
       }
 
       setForm({ ...EMPTY_FORM, area: area || "Vereinsbereich allgemein" });
+      if (screenshotInputRef.current) screenshotInputRef.current.value = "";
       setMessage("Die Meldung wurde übermittelt. Vielen Dank für den Hinweis.");
       await loadReports();
     } catch {
@@ -153,34 +164,20 @@ export default function FeedbackDialog({ open, onClose, verein, area }) {
       </p>
 
       <form className="mt-5 space-y-4" onSubmit={submit}>
-        <label className="block text-sm font-semibold text-zinc-800">
-          Art der Meldung
-          <select
-            className="input mt-2"
-            value={form.category}
-            onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
-          >
-            <option value="fehler">Fehler</option>
-            <option value="verbesserung">Verbesserungsvorschlag</option>
-            <option value="hinweis">Allgemeiner Hinweis</option>
-          </select>
-        </label>
+        <AppChoiceField
+          label="Art der Meldung"
+          value={form.category}
+          options={CATEGORY_OPTIONS}
+          onChange={(category) => setForm((current) => ({ ...current, category }))}
+        />
 
-        <label className="block text-sm font-semibold text-zinc-800">
-          Betroffener Bereich
-          <select
-            className="input mt-2"
-            value={form.area}
-            onChange={(event) => setForm((current) => ({ ...current, area: event.target.value }))}
-          >
-            {FEEDBACK_AREA_OPTIONS.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-          <span className="mt-1.5 block text-xs font-normal text-zinc-500">
-            Der aktuell geöffnete Bereich ist vorausgewählt und kann geändert werden.
-          </span>
-        </label>
+        <AppChoiceField
+          label="Betroffener Bereich"
+          value={form.area}
+          options={AREA_OPTIONS}
+          onChange={(selectedArea) => setForm((current) => ({ ...current, area: selectedArea }))}
+          helpText="Der aktuell geöffnete Bereich ist vorausgewählt und kann geändert werden."
+        />
 
         <label className="block text-sm font-semibold text-zinc-800">
           Kurze Überschrift
@@ -206,16 +203,23 @@ export default function FeedbackDialog({ open, onClose, verein, area }) {
           />
         </label>
 
-        <label className="block rounded-2xl border border-dashed border-indigo-300 bg-indigo-50/50 p-4 text-sm font-semibold text-indigo-800">
-          Screenshot hinzufügen
+        <div className="block rounded-2xl border border-dashed border-indigo-300 bg-indigo-50/50 p-4 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-50">
+          <span className="block">Screenshot hinzufügen</span>
           <input
-            className="mt-3 block w-full text-sm font-normal text-zinc-700 file:mr-3 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:font-semibold file:text-white"
+            ref={screenshotInputRef}
+            className="sr-only"
             type="file"
             accept="image/png,image/jpeg,image/webp"
             onChange={(event) => setForm((current) => ({ ...current, screenshot: event.target.files?.[0] || null }))}
           />
-          <span className="mt-2 block text-xs font-normal text-zinc-600">PNG, JPG oder WebP, maximal 8 MB</span>
-        </label>
+          <span className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" className="rounded-xl bg-indigo-600 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95" onClick={() => screenshotInputRef.current?.click()}>
+              Bild auswählen
+            </button>
+            <span className="min-w-0 flex-1 truncate font-normal text-zinc-600" aria-live="polite">{form.screenshot?.name || "Noch kein Screenshot gewählt"}</span>
+          </span>
+          <span className="mt-2 block text-xs font-normal leading-5 text-zinc-600">PNG, JPG oder WebP, maximal 8 MB</span>
+        </div>
 
         {previewUrl && (
           <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
@@ -223,7 +227,10 @@ export default function FeedbackDialog({ open, onClose, verein, area }) {
             <button
               type="button"
               className="btn btn-secondary mt-3"
-              onClick={() => setForm((current) => ({ ...current, screenshot: null }))}
+              onClick={() => {
+                setForm((current) => ({ ...current, screenshot: null }));
+                if (screenshotInputRef.current) screenshotInputRef.current.value = "";
+              }}
             >
               Screenshot entfernen
             </button>
