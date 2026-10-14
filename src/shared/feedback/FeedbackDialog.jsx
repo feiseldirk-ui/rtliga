@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import supabase from "../../lib/supabase/client";
 import {
   createFeedbackStoragePath,
+  FEEDBACK_AREA_OPTIONS,
   FEEDBACK_BUCKET,
   FEEDBACK_STATUS_LABELS,
   validateFeedbackDraft,
@@ -10,6 +11,7 @@ import AppDialog from "../ui/AppDialog";
 
 const EMPTY_FORM = {
   category: "fehler",
+  area: "Vereinsbereich allgemein",
   title: "",
   description: "",
   screenshot: null,
@@ -69,8 +71,12 @@ export default function FeedbackDialog({ open, onClose, verein, area }) {
     if (!open) return;
     setError("");
     setMessage("");
+    setForm((current) => ({
+      ...current,
+      area: area || current.area || "Vereinsbereich allgemein",
+    }));
     void loadReports();
-  }, [open, loadReports]);
+  }, [open, area, loadReports]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -116,7 +122,7 @@ export default function FeedbackDialog({ open, onClose, verein, area }) {
         category: form.category,
         title: form.title.trim(),
         description: form.description.trim(),
-        area: area || "Vereinsbereich",
+        area: form.area || area || "Vereinsbereich allgemein",
         screenshot_path: screenshotPath,
         page_url: safePageUrl,
         user_agent: navigator.userAgent,
@@ -130,7 +136,7 @@ export default function FeedbackDialog({ open, onClose, verein, area }) {
         throw insertError;
       }
 
-      setForm(EMPTY_FORM);
+      setForm({ ...EMPTY_FORM, area: area || "Vereinsbereich allgemein" });
       setMessage("Die Meldung wurde übermittelt. Vielen Dank für den Hinweis.");
       await loadReports();
     } catch {
@@ -162,7 +168,18 @@ export default function FeedbackDialog({ open, onClose, verein, area }) {
 
         <label className="block text-sm font-semibold text-zinc-800">
           Betroffener Bereich
-          <input className="input mt-2 bg-zinc-50" value={area || "Vereinsbereich"} readOnly />
+          <select
+            className="input mt-2"
+            value={form.area}
+            onChange={(event) => setForm((current) => ({ ...current, area: event.target.value }))}
+          >
+            {FEEDBACK_AREA_OPTIONS.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          <span className="mt-1.5 block text-xs font-normal text-zinc-500">
+            Der aktuell geöffnete Bereich ist vorausgewählt und kann geändert werden.
+          </span>
         </label>
 
         <label className="block text-sm font-semibold text-zinc-800">

@@ -5,6 +5,18 @@ export const FEEDBACK_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 export const FEEDBACK_STATUS = ["neu", "in_pruefung", "vorgesehen", "erledigt", "abgelehnt"];
 export const FEEDBACK_PRIORITIES = ["normal", "hoch", "dringend"];
 
+export const FEEDBACK_AREA_OPTIONS = [
+  "Vereinsbereich allgemein",
+  "Teilnehmer",
+  "Ergebnisse erfassen",
+  "Meine Ergebnisse",
+  "Rundenprotokolle",
+  "Rangliste / Gesamtergebnisse",
+  "WK-Zeitfenster",
+  "Anmeldung und Sitzung",
+  "Sonstiger Bereich",
+];
+
 export const FEEDBACK_STATUS_LABELS = {
   neu: "Neu",
   in_pruefung: "In Prüfung",

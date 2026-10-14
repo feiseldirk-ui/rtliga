@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   createFeedbackStoragePath,
+  FEEDBACK_AREA_OPTIONS,
   formatFeedbackForHandoff,
   validateFeedbackDraft,
 } from "../src/lib/feedback.js";
@@ -13,6 +14,20 @@ test("feedback validation accepts a useful report", () => {
     description: "Beim Speichern erscheint eine Fehlermeldung.",
     screenshot: { type: "image/png", size: 1024 },
   }), "");
+});
+
+test("feedback offers the relevant club areas", () => {
+  assert.deepEqual(FEEDBACK_AREA_OPTIONS, [
+    "Vereinsbereich allgemein",
+    "Teilnehmer",
+    "Ergebnisse erfassen",
+    "Meine Ergebnisse",
+    "Rundenprotokolle",
+    "Rangliste / Gesamtergebnisse",
+    "WK-Zeitfenster",
+    "Anmeldung und Sitzung",
+    "Sonstiger Bereich",
+  ]);
 });
 
 test("feedback validation rejects unsupported or oversized screenshots", () => {

@@ -488,7 +488,14 @@ export default function VereinStart() {
     { key: "protokolle",  label: "Protokolle",    short: "Proto." },
     { key: "gesamt",      label: "Rangliste",     short: "Rang." },
   ];
-  const activeTabLabel = tabItems.find((item) => item.key === activeTab)?.label || "Vereinsbereich";
+  const feedbackAreaByTab = {
+    teilnehmer: "Teilnehmer",
+    ergebnisse: "Ergebnisse erfassen",
+    meine: "Meine Ergebnisse",
+    protokolle: "Rundenprotokolle",
+    gesamt: "Rangliste / Gesamtergebnisse",
+  };
+  const activeFeedbackArea = feedbackAreaByTab[activeTab] || "Vereinsbereich allgemein";
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -659,7 +666,7 @@ export default function VereinStart() {
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
         verein={verein}
-        area={activeTabLabel}
+        area={activeFeedbackArea}
       />
     </div>
   );
