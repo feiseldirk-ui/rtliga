@@ -10,6 +10,7 @@ import SaisonPdfTab from "./SaisonPdfTab";
 import ArchivTab from "./ArchivTab";
 import RundenprotokollTab from "./RundenprotokollTab";
 import AdminManagementTab from "./AdminManagementTab";
+import FeedbackTab from "./FeedbackTab";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
 import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 import BrandMark from "../../../shared/ui/BrandMark";
@@ -46,6 +47,7 @@ function AdminDashboard({ adminEmail, logout }) {
       { key: "ergebnisse", label: "Gesamtergebnisse", title: "Ligaauswertung", description: "Gesamtergebnisse je Altersklasse prüfen und exportieren." },
       { key: "pdf", label: "PDF-Editor", title: "PDF-Vorlagen und Vorschau", description: "Logos, Titel, Qualifikationslinie und freie Textfelder direkt in der Vorschau anpassen." },
       { key: "archiv", label: "Archiv", title: "Archiv & Saisonwechsel", description: "Neue Saison absichern und Archivierung vorbereiten." },
+      { key: "meldungen", label: "Meldungen", title: "Fehler und Hinweise", description: "Meldungen der Vereine prüfen, beantworten und für eine Anpassung vorbereiten." },
       { key: "admins", label: "Admins", title: "Admin-Verwaltung", description: "Admins synchron aus Supabase laden, neue Admins per E-Mail freischalten und Einträge sicher entfernen." },
     ],
     []
@@ -174,6 +176,7 @@ function AdminDashboard({ adminEmail, logout }) {
           {activeTab === "ergebnisse" ? <ErgebnisseTab /> : null}
           {activeTab === "pdf" ? <SaisonPdfTab /> : null}
           {activeTab === "archiv" ? <ArchivTab /> : null}
+          {activeTab === "meldungen" ? <FeedbackTab /> : null}
           {activeTab === "admins" ? <AdminManagementTab /> : null}
         </div>
       </div>

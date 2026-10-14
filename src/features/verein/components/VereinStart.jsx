@@ -13,6 +13,7 @@ import TeilnehmerPanel from "../../../shared/ui/dashboard/TeilnehmerPanel";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
 import WkTimeWindowsModal from "../../../shared/ui/WkTimeWindowsModal";
 import BrandMark from "../../../shared/ui/BrandMark";
+import FeedbackDialog from "../../../shared/feedback/FeedbackDialog";
 
 import VereinErgebnisseEintragen from "./VereinErgebnisseEintragen";
 import VereinErgebnisseAnzeigen from "./VereinErgebnisseAnzeigen";
@@ -119,6 +120,7 @@ export default function VereinStart() {
   const [zeitfensterError, setZeitfensterError] = useState("");
   const [zeitfensterCurrentTime, setZeitfensterCurrentTime] = useState(() => Date.now());
   const [zeitfensterSeason, setZeitfensterSeason] = useState(() => getActiveSeason());
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const [form, setForm] = useState({
     vorname: "",
@@ -486,6 +488,7 @@ export default function VereinStart() {
     { key: "protokolle",  label: "Protokolle",    short: "Proto." },
     { key: "gesamt",      label: "Rangliste",     short: "Rang." },
   ];
+  const activeTabLabel = tabItems.find((item) => item.key === activeTab)?.label || "Vereinsbereich";
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -572,6 +575,15 @@ export default function VereinStart() {
               WK-Zeitfenster
             </button>
 
+            <button
+              type="button"
+              onClick={() => setFeedbackOpen(true)}
+              className="shrink-0 whitespace-nowrap rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-100"
+            >
+              <span className="mr-1.5" aria-hidden="true">✎</span>
+              Fehler oder Hinweis
+            </button>
+
             {/* Stats mobil – ganz rechts in der Tab-Zeile */}
             <div className="ml-auto flex md:hidden items-center gap-1 shrink-0 pl-2">
               <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
@@ -641,6 +653,13 @@ export default function VereinStart() {
         onDiscard={handleModalDiscard}
         onCancel={handleModalCancel}
         busy={unsavedActionBusy}
+      />
+
+      <FeedbackDialog
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        verein={verein}
+        area={activeTabLabel}
       />
     </div>
   );
