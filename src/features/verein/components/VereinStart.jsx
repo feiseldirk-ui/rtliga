@@ -14,6 +14,7 @@ import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
 import WkTimeWindowsModal from "../../../shared/ui/WkTimeWindowsModal";
 import BrandMark from "../../../shared/ui/BrandMark";
 import FeedbackDialog from "../../../shared/feedback/FeedbackDialog";
+import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 
 import VereinErgebnisseEintragen from "./VereinErgebnisseEintragen";
 import VereinErgebnisseAnzeigen from "./VereinErgebnisseAnzeigen";
@@ -121,6 +122,7 @@ export default function VereinStart() {
   const [zeitfensterCurrentTime, setZeitfensterCurrentTime] = useState(() => Date.now());
   const [zeitfensterSeason, setZeitfensterSeason] = useState(() => getActiveSeason());
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [participantToDelete, setParticipantToDelete] = useState(null);
 
   const [form, setForm] = useState({
     vorname: "",
@@ -453,11 +455,12 @@ export default function VereinStart() {
     setForm({ vorname: "", name: "", altersklasse: "" });
   };
 
-  const onDelete = async (id) => {
+  const onDelete = async (id, confirmed = false) => {
     if (!verein) return;
-
-    const bestaetigt = window.confirm("Teilnehmer wirklich löschen?");
-    if (!bestaetigt) return;
+    if (!confirmed) {
+      setParticipantToDelete(teilnehmer.find((row) => row.id === id) || { id });
+      return;
+    }
     setSessionNotice("");
 
     const { error } = await supabase
@@ -667,6 +670,19 @@ export default function VereinStart() {
         onClose={() => setFeedbackOpen(false)}
         verein={verein}
         area={activeFeedbackArea}
+      />
+      <ConfirmDialog
+        open={Boolean(participantToDelete)}
+        title="Teilnehmer wirklich löschen?"
+        message={participantToDelete ? `${participantToDelete.vorname || ""} ${participantToDelete.name || ""}\n\nDer Teilnehmer wird aus dem Verein entfernt. Diese Aktion kann nicht rückgängig gemacht werden.`.trim() : ""}
+        confirmLabel="Teilnehmer löschen"
+        tone="danger"
+        onCancel={() => setParticipantToDelete(null)}
+        onConfirm={() => {
+          const id = participantToDelete?.id;
+          setParticipantToDelete(null);
+          if (id) onDelete(id, true);
+        }}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import supabase from "../../../lib/supabase/client";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
 import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
+import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 
 const getTeilnehmerBadgeClass = (count) => {
   if (count >= 10) return "border-emerald-200 bg-emerald-50 text-emerald-700";
@@ -67,6 +68,7 @@ const VereineTab = ({ onRefreshStats }) => {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState("");
   const [auditOpen, setAuditOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const requestIdRef = useRef(0);
 
@@ -232,7 +234,7 @@ const VereineTab = ({ onRefreshStats }) => {
     setEditError("");
   };
 
-  const saveParticipantCorrection = async (teilnehmer) => {
+  const saveParticipantCorrection = async (teilnehmer, confirmed = false) => {
     const vorname = editForm.vorname.trim();
     const name = editForm.name.trim();
     const altersklasse = editForm.altersklasse.trim();
@@ -257,10 +259,10 @@ const VereineTab = ({ onRefreshStats }) => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Teilnehmerdaten wirklich ändern?\n\n${teilnehmer.vorname} ${teilnehmer.name} (${teilnehmer.altersklasse || "ohne Klasse"})\n→\n${vorname} ${name} (${altersklasse})\n\nGrund: ${bemerkung}\n\nVorhandene Ergebnisse bleiben demselben Teilnehmer zugeordnet.`
-    );
-    if (!confirmed) return;
+    if (!confirmed) {
+      setConfirmAction({ type: "participant", teilnehmer, message: `${teilnehmer.vorname} ${teilnehmer.name} (${teilnehmer.altersklasse || "ohne Klasse"})\n→\n${vorname} ${name} (${altersklasse})\n\nGrund: ${bemerkung}\n\nVorhandene Ergebnisse bleiben demselben Teilnehmer zugeordnet.` });
+      return;
+    }
 
     setEditSaving(true);
     setEditError("");
@@ -304,7 +306,7 @@ const VereineTab = ({ onRefreshStats }) => {
     setEditError("");
   };
 
-  const saveClubCorrection = async (verein) => {
+  const saveClubCorrection = async (verein, confirmed = false) => {
     const vereinsname = clubForm.vereinsname.trim();
     const bemerkung = clubForm.bemerkung.trim();
 
@@ -321,10 +323,10 @@ const VereineTab = ({ onRefreshStats }) => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Vereinsname wirklich ändern?\n\n${verein.vereinsname}\n→\n${vereinsname}\n\nGrund: ${bemerkung}\n\nLogin-Daten werden nicht verändert. Teilnehmer und vorhandene Ergebnisse bleiben demselben Verein zugeordnet.`
-    );
-    if (!confirmed) return;
+    if (!confirmed) {
+      setConfirmAction({ type: "club", verein, message: `${verein.vereinsname}\n→\n${vereinsname}\n\nGrund: ${bemerkung}\n\nLogin-Daten werden nicht verändert. Teilnehmer und vorhandene Ergebnisse bleiben demselben Verein zugeordnet.` });
+      return;
+    }
 
     setClubSaving(true);
     setEditError("");
@@ -617,6 +619,21 @@ const VereineTab = ({ onRefreshStats }) => {
           </div>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        title={confirmAction?.type === "participant" ? "Teilnehmerdaten ändern?" : "Vereinsname ändern?"}
+        message={confirmAction?.message || ""}
+        confirmLabel={confirmAction?.type === "participant" ? "Teilnehmerdaten ändern" : "Vereinsname ändern"}
+        tone="warning"
+        busy={editSaving || clubSaving}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          const action = confirmAction;
+          setConfirmAction(null);
+          if (action?.type === "participant") saveParticipantCorrection(action.teilnehmer, true);
+          if (action?.type === "club") saveClubCorrection(action.verein, true);
+        }}
+      />
     </div>
   );
 };

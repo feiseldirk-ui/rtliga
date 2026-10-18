@@ -5,6 +5,7 @@ import { getActiveSeason } from "../../../lib/seasonScope";
 import { evaluateZeitfenster } from "../../../lib/wettkampfZeitfenster";
 import { initialWindowState, toLocalInput, validateWindow, windowReducer, windowSnapshot } from "../../../lib/timeWindowAdmin";
 import DateTimePicker from "../../../shared/ui/DateTimePicker";
+import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 
 const formatDate = value => value ? new Date(value).toLocaleString("de-DE", {
   day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
@@ -32,6 +33,7 @@ export default function ZeitfensterTab({ onRefreshStats }) {
   const [state, dispatch] = useReducer(windowReducer, initialWindowState);
   const [season] = useState(() => getActiveSeason());
   const [now, setNow] = useState(() => Date.now());
+  const [resetRequest, setResetRequest] = useState(null);
   const requestId = useRef(0);
   const busy = useRef(false);
   const mounted = useRef(true);
@@ -71,12 +73,16 @@ export default function ZeitfensterTab({ onRefreshStats }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  const save = async (wk, reset = false) => {
+  const save = async (wk, reset = false, confirmed = false) => {
     if (busy.current || state.loading || state.loadError) return;
     const row = state.rows.find(item => Number(item.wettkampf) === wk);
     const draft = state.drafts[wk];
     if (reset) {
-      if (!row || !window.confirm("Zeitfenster von WK" + wk + " für Saison " + season + " wirklich entfernen? Beginn und Ende werden gelöscht. Ergebnisse bleiben erhalten, sind ohne Zeitfenster aber gegebenenfalls nicht mehr öffentlich sichtbar.")) return;
+      if (!row) return;
+      if (!confirmed) {
+        setResetRequest({ wk });
+        return;
+      }
     } else {
       if (!draft) return;
       const message = validateWindow(draft, state.rows);
@@ -158,6 +164,20 @@ export default function ZeitfensterTab({ onRefreshStats }) {
           </section>
         );
       })}
+      <ConfirmDialog
+        open={Boolean(resetRequest)}
+        title="Zeitfenster entfernen?"
+        message={resetRequest ? `Das Zeitfenster von WK${resetRequest.wk} für Saison ${season} wird entfernt.\n\nBeginn und Ende werden gelöscht. Ergebnisse bleiben erhalten, sind ohne Zeitfenster aber gegebenenfalls nicht mehr öffentlich sichtbar.` : ""}
+        confirmLabel="Zeitfenster entfernen"
+        tone="danger"
+        busy={state.pending !== null}
+        onCancel={() => setResetRequest(null)}
+        onConfirm={() => {
+          const wk = resetRequest?.wk;
+          setResetRequest(null);
+          if (wk) save(wk, true, true);
+        }}
+      />
     </div>
   );
 }

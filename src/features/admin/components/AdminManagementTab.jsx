@@ -8,6 +8,7 @@ import {
   normalizeAdminEmail,
   removeAdminByUserId,
 } from "../../../lib/admins";
+import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 
 function withTimeout(promise, timeoutMs = 15000) {
   let timeoutId;
@@ -35,6 +36,7 @@ export default function AdminManagementTab() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [lastSync, setLastSync] = useState(null);
+  const [adminToRemove, setAdminToRemove] = useState(null);
   const requestIdRef = useRef(0);
 
   const loadAdmins = useCallback(async ({ keepLoading = false } = {}) => {
@@ -113,14 +115,10 @@ export default function AdminManagementTab() {
     }
   };
 
-  const handleRemoveAdmin = async (adminRow) => {
+  const handleRemoveAdmin = async (adminRow, confirmed = false) => {
     if (!adminRow?.user_id) return;
-
-    const confirmed = window.confirm(
-      `Admin wirklich entfernen?\n\n${adminRow.email}\n\nDer Auth-Benutzer bleibt bestehen. Es wird nur der Eintrag aus public.admins entfernt.`
-    );
-
     if (!confirmed) {
+      setAdminToRemove(adminRow);
       return;
     }
 
@@ -276,6 +274,20 @@ export default function AdminManagementTab() {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={Boolean(adminToRemove)}
+        title="Admin wirklich entfernen?"
+        message={adminToRemove ? `${adminToRemove.email}\n\nDer Auth-Benutzer bleibt bestehen. Nur die Adminberechtigung wird entfernt.` : ""}
+        confirmLabel="Admin entfernen"
+        tone="danger"
+        busy={submitting}
+        onCancel={() => setAdminToRemove(null)}
+        onConfirm={() => {
+          const adminRow = adminToRemove;
+          setAdminToRemove(null);
+          if (adminRow) handleRemoveAdmin(adminRow, true);
+        }}
+      />
     </div>
   );
 }
