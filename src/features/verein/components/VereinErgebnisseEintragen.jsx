@@ -503,7 +503,20 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
     setSavingIndex(tidx);
     setSaveFeedback((current) => ({ ...current, [tidx]: { tone: "saving", text: "Speichert…" } }));
 
-    for (let wkidx = 0; wkidx < t.ergebnisse.length; wkidx += 1) {
+    const offeneWettkaempfe = t.ergebnisse
+      .map((_, wkidx) => wkidx)
+      .filter((wkidx) => getWettkampfStatus(wkidx).offen);
+
+    if (offeneWettkaempfe.length === 0) {
+      setSaveFeedback((current) => ({
+        ...current,
+        [tidx]: { tone: "error", text: "Aktuell ist kein Wettkampf zur Eingabe geöffnet." },
+      }));
+      setSavingIndex(null);
+      return false;
+    }
+
+    for (const wkidx of offeneWettkaempfe) {
       const wk = t.ergebnisse[wkidx];
 
       const { error } = await supabase.rpc("save_verein_ergebnis", {
