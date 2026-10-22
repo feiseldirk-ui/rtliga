@@ -21,7 +21,11 @@ export default function KennwortVergessen() {
   const [searchParams] = useSearchParams();
   const initialEmail = searchParams.get("email") || "";
   const context = searchParams.get("context") || "verein";
-  const backTarget = searchParams.get("back") || (context === "admin" ? "/admin" : "/login");
+  const requestedBackTarget = searchParams.get("back");
+  const allowedBackTargets = new Set(["/", "/login", "/admin"]);
+  const backTarget = allowedBackTargets.has(requestedBackTarget)
+    ? requestedBackTarget
+    : (context === "admin" ? "/admin" : "/login");
   const [email, setEmail] = useState(initialEmail);
   const normalizedEmail = email.trim().toLowerCase();
 

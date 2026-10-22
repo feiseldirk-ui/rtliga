@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
-import * as XLSX from "xlsx";
+import { createXlsxWorkbook } from "../../../lib/xlsxExport";
 import { waitForSession } from "../../../lib/authReady";
 import { logError } from "../../../lib/logger";
 import { subscribeToTables } from "../../../lib/realtime";
@@ -158,11 +158,9 @@ const ErgebnisseTab = () => {
   const altersklassenCount = useMemo(() => Object.keys(gruppierteErgebnisse).length, [gruppierteErgebnisse]);
   const teilnehmerGesamt = useMemo(() => Object.values(gruppierteErgebnisse).reduce((sum, list) => sum + list.length, 0), [gruppierteErgebnisse]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (exportFormat === "xlsx") {
-      const wb = XLSX.utils.book_new();
-
-      Object.entries(gruppierteErgebnisse).forEach(([klasse, teilnehmer]) => {
+      const sheets = Object.entries(gruppierteErgebnisse).map(([klasse, teilnehmer]) => {
         const daten = teilnehmer.map((t) => {
           const wkDaten = {};
           t.punkte.forEach((pkt, i) => {
@@ -178,11 +176,22 @@ const ErgebnisseTab = () => {
           };
         });
 
-        const ws = XLSX.utils.json_to_sheet(daten);
-        XLSX.utils.book_append_sheet(wb, ws, klasse);
+        const headers = ["Vorname", "Nachname", "Verein", ...Array.from({ length: WK_ANZAHL }, (_, index) => `WK${index + 1}`), "Gesamt"];
+        return {
+          name: klasse || "Ergebnisse",
+          headers,
+          rows: daten.map((row) => headers.map((header) => row[header] ?? "")),
+        };
       });
 
-      XLSX.writeFile(wb, "Ergebnisse.xlsx");
+      const buffer = createXlsxWorkbook(sheets);
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }));
+      link.download = "Ergebnisse.xlsx";
+      link.click();
+      URL.revokeObjectURL(link.href);
       return;
     }
 
@@ -207,13 +216,18 @@ const ErgebnisseTab = () => {
         });
       });
 
-      const ws = XLSX.utils.json_to_sheet(alleDaten);
-      const csv = XLSX.utils.sheet_to_csv(ws);
+      const headers = ["Altersklasse", "Vorname", "Nachname", "Verein", ...Array.from({ length: WK_ANZAHL }, (_, index) => `WK${index + 1}`), "Gesamt"];
+      const escapeCsv = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+      const csv = [
+        headers.map(escapeCsv).join(";"),
+        ...alleDaten.map((row) => headers.map((header) => escapeCsv(row[header])).join(";")),
+      ].join("\r\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = "Ergebnisse.csv";
       link.click();
+      URL.revokeObjectURL(link.href);
       return;
     }
 

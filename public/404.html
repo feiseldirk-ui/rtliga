@@ -2,25 +2,9 @@
 <html lang="de">
   <head>
     <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; form-action 'self'" />
     <title>RTLiga</title>
-    <script>
-      (function () {
-        const l = window.location;
-        const repoBase = "/rtliga";
-        const path = l.pathname.replace(repoBase, "") + l.search;
-        const encoded = path.replace(/&/g, "~and~");
-        l.replace(
-          l.protocol +
-            "//" +
-            l.hostname +
-            (l.port ? ":" + l.port : "") +
-            repoBase +
-            "/?p=" +
-            encoded +
-            l.hash
-        );
-      })();
-    </script>
+    <script src="/rtliga/404-redirect.js"></script>
   </head>
   <body>
     <p>Weiterleitung…</p>
