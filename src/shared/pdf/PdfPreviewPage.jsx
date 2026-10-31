@@ -274,10 +274,11 @@ export default function PdfPreviewPage({
 
           <div className="absolute inset-x-6 top-[224px] space-y-5">
             {normalizedClasses.map(([klasse, rows]) => {
+              const studentRound = !isOverallMode && String(klasse).trim().toLowerCase() === "schüler";
               const tableRows = isOverallMode ? normalizeOverallRows(rows) : rows;
               const valueColumns = isOverallMode
                 ? Array.from({ length: 9 }, (_, index) => ({ key: `wk-${index + 1}`, label: `WK${index + 1}` }))
-                : roundHeaders.map((label) => ({ key: label.toLowerCase(), label }));
+                : (studentRound ? ['S1', 'S2', 'S3', 'S4', 'LL', 'Gesamt'] : roundHeaders).map((label) => ({ key: label.toLowerCase(), label }));
               const nameColumnWidth = isOverallMode ? "w-[84px]" : showClubColumn ? "w-[102px]" : "w-[118px]";
               const clubColumnWidth = isOverallMode ? "w-[126px]" : "w-[154px]";
               const valueColumnWidth = isOverallMode ? "w-[42px]" : showClubColumn ? "w-[36px]" : "w-[43px]";
@@ -305,7 +306,7 @@ export default function PdfPreviewPage({
                         {tableRows.map((row, idx) => {
                           const values = isOverallMode
                             ? row.wkValues || []
-                            : [row.s1, row.s2, row.s3, row.s4, row.s5, row.s6, row.ll, row.sl, row.gesamt].map((value) => ({ text: value, strikeout: false }));
+                            : (studentRound ? [row.s1, row.s2, row.s3, row.s4, row.ll, row.gesamt] : [row.s1, row.s2, row.s3, row.s4, row.s5, row.s6, row.ll, row.sl, row.gesamt]).map((value) => ({ text: value, strikeout: false }));
                           return (
                             <React.Fragment key={`${klasse}-${displayName(row)}-${idx}`}>
                               <tr className={idx % 2 === 0 ? "bg-white" : "bg-zinc-50/70"}>

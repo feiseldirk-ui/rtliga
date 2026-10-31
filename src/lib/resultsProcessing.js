@@ -1,3 +1,5 @@
+import { isStudentClass, seriesTotals } from './seriesRules.js';
+
 const WK_ANZAHL = 9;
 
 function parseNumber(text, key) {
@@ -16,6 +18,7 @@ function getSeries(entry) {
 }
 
 export function getEntryTotals(entry) {
+  if (isStudentClass(entry.altersklasse)) return seriesTotals(Object.fromEntries(getSeries(entry).map((v, i) => [`s${i+1}`, v])), entry.altersklasse);
   const ll = entry.ll != null ? Number(entry.ll || 0) : parseNumber(entry.ergebnis, "LL");
   const sl = entry.sl != null ? Number(entry.sl || 0) : parseNumber(entry.ergebnis, "SL");
   const gesamt =

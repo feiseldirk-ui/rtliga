@@ -1,3 +1,4 @@
+import { isStudentClass, seriesTotals } from '../../../lib/seriesRules';
 import { sanitizeSerieValue } from '../../../lib/seriesInput';
 import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -51,7 +52,7 @@ export default function KorrekturenTab() {
     setError(''); setNotice('');
   }
   function editResult(row) {
-    setDraft({ type: 'result', original: row, series: seriesKeys.map(k => String(row[k] ?? 0)), reason: '' });
+    setDraft({ type: 'result', original: row, series: seriesKeys.map((k, i) => String(isStudentClass(row.altersklasse) && i > 3 ? 0 : (row[k] ?? 0))), reason: '' });
     setError(''); setNotice('');
   }
   function prepare(event) {
@@ -96,7 +97,7 @@ export default function KorrekturenTab() {
     </>}
     {draft && <form onSubmit={prepare} className="space-y-4 rounded-3xl border border-indigo-200 bg-white p-5">
       <h3 className="text-lg font-bold">{draft.type === 'result' ? `Ergebnis korrigieren · WK ${draft.original.wettkampf}` : 'Name / Klasse korrigieren'} · {person?.vorname} {person?.name}</h3>
-      {draft.type === 'result' ? <><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{draft.series.map((s, i) => <label key={i} className="text-sm font-semibold">S{i + 1} <span className="font-normal text-zinc-500">(bisher {draft.original[seriesKeys[i]] ?? 0})</span><input className="input mt-1" type="number" min="0" max="100" step="1" required inputMode="numeric" value={s} disabled={busy || (person?.altersklasse === 'Schüler' && i > 3)} onChange={e => setDraft({ ...draft, series: draft.series.map((v, j) => j === i ? sanitizeSerieValue(e.target.value) : v) })} /></label>)}</div><div className="rounded-2xl bg-indigo-50 p-4 font-semibold text-indigo-900">LL: {draft.series.slice(0, 3).reduce((s, v) => s + Number(v), 0)} · SL: {draft.series.slice(3).reduce((s, v) => s + Number(v), 0)} · Gesamt: {draft.series.reduce((s, v) => s + Number(v), 0)}</div></>
+      {draft.type === 'result' ? <><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{draft.series.slice(0, isStudentClass(draft.original.altersklasse) ? 4 : 6).map((s, i) => <label key={i} className="text-sm font-semibold">S{i + 1} <span className="font-normal text-zinc-500">(bisher {draft.original[seriesKeys[i]] ?? 0})</span><input className="input mt-1" type="number" min="0" max="100" step="1" required inputMode="numeric" value={s} disabled={busy || (person?.altersklasse === 'Schüler' && i > 3)} onChange={e => setDraft({ ...draft, series: draft.series.map((v, j) => j === i ? sanitizeSerieValue(e.target.value) : v) })} /></label>)}</div><div className="rounded-2xl bg-indigo-50 p-4 font-semibold text-indigo-900">{isStudentClass(draft.original.altersklasse) ? '2 × 2 Serien Langsamlauf · maximal 400 Ringe · ' : ''}LL: {seriesTotals(Object.fromEntries(seriesKeys.map((k, i) => [k, draft.series[i]])), draft.original.altersklasse).ll} · SL: {seriesTotals(Object.fromEntries(seriesKeys.map((k, i) => [k, draft.series[i]])), draft.original.altersklasse).sl} · Gesamt: {draft.series.reduce((s, v) => s + Number(v), 0)}</div></>
         : <div className="grid gap-3 sm:grid-cols-3"><label>Vorname<input className="input mt-1" required maxLength="100" value={draft.first} onChange={e => setDraft({ ...draft, first: e.target.value })} /></label><label>Nachname<input className="input mt-1" required maxLength="100" value={draft.last} onChange={e => setDraft({ ...draft, last: e.target.value })} /></label><label>Klasse<AppSelect className="input mt-1" value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value })}>{classes.map(c => <option key={c}>{c}</option>)}</AppSelect></label></div>}
       <label className="block text-sm font-semibold">Grund der Änderung (Pflicht)<textarea className="input mt-1 min-h-28" required minLength="5" maxLength="2000" placeholder="Zum Beispiel: Zahlendreher, nach Abgleich mit dem Originalprotokoll korrigiert." value={draft.reason} onChange={e => setDraft({ ...draft, reason: e.target.value })} /></label>
       <div className="flex flex-wrap gap-3"><button className="btn btn-primary" disabled={busy}>Korrektur prüfen</button><button type="button" className="btn btn-secondary" disabled={busy} onClick={() => { setDraft(null); setError(''); }}>Abbrechen</button></div>

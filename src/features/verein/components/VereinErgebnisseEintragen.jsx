@@ -1,3 +1,4 @@
+import { isStudentClass, seriesTotals } from '../../../lib/seriesRules';
 import { sanitizeSerieValue } from '../../../lib/seriesInput';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
@@ -38,17 +39,11 @@ function parseStatus(text) {
   return match?.[1]?.trim() || "";
 }
 
-function calcLL(wk) {
-  return Number(wk.s1 || 0) + Number(wk.s2 || 0) + Number(wk.s3 || 0);
-}
+function calcLL(wk, category) { return seriesTotals(wk, category).ll; }
 
-function calcSL(wk) {
-  return Number(wk.s4 || 0) + Number(wk.s5 || 0) + Number(wk.s6 || 0);
-}
+function calcSL(wk, category) { return seriesTotals(wk, category).sl; }
 
-function calcWKGesamt(wk) {
-  return calcLL(wk) + calcSL(wk);
-}
+function calcWKGesamt(wk, category) { return seriesTotals(wk, category).gesamt; }
 
 function calcTeilnehmerGesamt(ergebnisse = []) {
   return ergebnisse.reduce((sum, wk) => sum + Number(wk.gesamt || 0), 0);
@@ -69,7 +64,7 @@ function createEmptyWK() {
   };
 }
 
-function hydrateWK(entry) {
+function hydrateWK(entry, category) {
   if (!entry) return createEmptyWK();
 
   const structured = {
@@ -107,8 +102,8 @@ function hydrateWK(entry) {
     ].some((value) => value !== "");
 
     if (hasEinzelserien) {
-      const ll = calcLL(structured);
-      const sl = calcSL(structured);
+      const ll = calcLL(structured, category);
+      const sl = calcSL(structured, category);
       const gesamt = ll + sl;
 
       return {
@@ -132,8 +127,8 @@ function hydrateWK(entry) {
     status: parseStatus(entry.ergebnis),
   };
 
-  const llFromSeries = calcLL(legacy);
-  const slFromSeries = calcSL(legacy);
+  const llFromSeries = calcLL(legacy, category);
+  const slFromSeries = calcSL(legacy, category);
   const ll = llFromSeries || parseNumber(entry.ergebnis, "LL");
   const sl = slFromSeries || parseNumber(entry.ergebnis, "SL");
   const gesamt = ll + sl || parseNumber(entry.ergebnis, "Gesamt");
@@ -330,7 +325,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
             Number(e.wettkampf) === i + 1
         );
 
-        return hydrateWK(eintrag);
+        return hydrateWK(eintrag, t.altersklasse);
       });
 
       return {
@@ -478,9 +473,9 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
       const ergebnisse = [...person.ergebnisse];
       const wk = { ...ergebnisse[wkidx], [field]: sanitized };
 
-      wk.ll = calcLL(wk);
-      wk.sl = calcSL(wk);
-      wk.gesamt = calcWKGesamt(wk);
+      wk.ll = calcLL(wk, person.altersklasse);
+      wk.sl = calcSL(wk, person.altersklasse);
+      wk.gesamt = calcWKGesamt(wk, person.altersklasse);
 
       ergebnisse[wkidx] = wk;
       person.ergebnisse = ergebnisse;
@@ -524,8 +519,8 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
         p_s2: Number(wk.s2 || 0),
         p_s3: Number(wk.s3 || 0),
         p_s4: Number(wk.s4 || 0),
-        p_s5: Number(wk.s5 || 0),
-        p_s6: Number(wk.s6 || 0),
+        p_s5: isStudentClass(t.altersklasse) ? 0 : Number(wk.s5 || 0),
+        p_s6: isStudentClass(t.altersklasse) ? 0 : Number(wk.s6 || 0),
         p_ll: Number(wk.ll || 0),
         p_sl: Number(wk.sl || 0),
         p_gesamt: Number(wk.gesamt || 0),
@@ -885,11 +880,11 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
                               <div className="grid gap-3 lg:grid-cols-2">
                             <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-3">
                               <div className="mb-3 text-sm font-semibold text-zinc-700">
-                                Langsamlauf
+                                Langsamlauf {isStudentClass(t.altersklasse) ? '(2 × 2 Serien, maximal 400 Ringe)' : ''}
                               </div>
 
                               <div className="grid grid-cols-3 gap-2">
-                                {["s1", "s2", "s3"].map((key, idx) => (
+                                {(isStudentClass(t.altersklasse) ? ["s1", "s2", "s3", "s4"] : ["s1", "s2", "s3"]).map((key, idx) => (
                                   <div key={key}>
                                     <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
                                       S{idx + 1}
@@ -924,7 +919,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
                               </div>
                             </div>
 
-                            <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-3">
+                            {!isStudentClass(t.altersklasse) && <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-3">
                               <div className="mb-3 text-sm font-semibold text-zinc-700">
                                 Schnellauf
                               </div>
@@ -963,7 +958,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
                                   {wk.sl}
                                 </div>
                               </div>
-                            </div>
+                            </div>}
                           </div>
 
                               <div className="mt-3 rounded-2xl border border-indigo-100 bg-indigo-50 px-3 py-2.5">
