@@ -1,3 +1,4 @@
+import { seriesColumns, isStudentClass } from '../../../lib/seriesRules';
 import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
@@ -234,9 +235,9 @@ export default function RundenprotokollTab() {
                   <th className="px-4 py-3">Platz</th>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Verein</th>
-                  {[1, 2, 3, 4, 5, 6].map((serie) => <th key={serie} className="px-3 py-3 text-center">S{serie}</th>)}
+                  {seriesColumns(klasse).map((column) => <th key={column.key} className="px-3 py-3 text-center">{column.label}</th>)}
                   <th className="px-3 py-3 text-center">LL</th>
-                  <th className="px-3 py-3 text-center">SL</th>
+                  {!isStudentClass(klasse) && <th className="px-3 py-3 text-center">SL</th>}
                   <th className="px-3 py-3 text-center">Ges.</th>
                 </tr>
               </thead>
@@ -246,9 +247,9 @@ export default function RundenprotokollTab() {
                     <td className="px-4 py-3 font-semibold text-zinc-900">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium text-zinc-900">{row.vorname} {row.nachname}</td>
                     <td className="px-4 py-3">{row.verein || "–"}</td>
-                    {[row.s1, row.s2, row.s3, row.s4, row.s5, row.s6].map((value, serieIndex) => <td key={serieIndex} className="px-3 py-3 text-center">{value}</td>)}
+                    {seriesColumns(klasse).map(column => row[column.key]).map((value, serieIndex) => <td key={serieIndex} className="px-3 py-3 text-center">{value}</td>)}
                     <td className="px-3 py-3 text-center font-semibold">{row.ll}</td>
-                    <td className="px-3 py-3 text-center font-semibold">{row.sl}</td>
+                    {!isStudentClass(klasse) && <td className="px-3 py-3 text-center font-semibold">{row.sl}</td>}
                     <td className="px-3 py-3 text-center font-semibold text-zinc-900">{row.gesamt}</td>
                   </tr>
                 ))}

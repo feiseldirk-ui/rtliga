@@ -1,4 +1,4 @@
-import { isStudentClass, seriesTotals } from '../../../lib/seriesRules';
+import { isStudentClass, seriesTotals, seriesLabel } from '../../../lib/seriesRules';
 import { sanitizeSerieValue } from '../../../lib/seriesInput';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
@@ -773,10 +773,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
                         Eingabestruktur
                       </p>
                       <p className="mt-2 text-sm text-zinc-700">
-                        Jeder Wettkampf besteht aus
-                        <span className="font-semibold text-zinc-900"> 2 Teilblöcken</span> mit
-                        jeweils
-                        <span className="font-semibold text-zinc-900"> 3 Einzelserien</span>.
+                        {isStudentClass(t.altersklasse) ? "Schüler: 2 × 2 Serien Langsamlauf (LL 1–4), kein Schnelllauf." : "Langsamlauf: LL 1–3. Schnelllauf: SL 1–3. Jeder Teilblock umfasst drei Serien."}
                       </p>
                     </div>
 
@@ -887,7 +884,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
                                 {(isStudentClass(t.altersklasse) ? ["s1", "s2", "s3", "s4"] : ["s1", "s2", "s3"]).map((key, idx) => (
                                   <div key={key}>
                                     <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
-                                      S{idx + 1}
+                                      {seriesLabel(idx, t.altersklasse)}
                                     </label>
                                     <input
                                       type="text"
@@ -928,7 +925,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
                                 {["s4", "s5", "s6"].map((key, idx) => (
                                   <div key={key}>
                                     <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
-                                      S{idx + 4}
+                                      {seriesLabel(idx + 3, t.altersklasse)}
                                     </label>
                                     <input
                                       type="text"

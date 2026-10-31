@@ -1,3 +1,4 @@
+import { seriesColumns, isStudentClass } from '../../../lib/seriesRules';
 import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
@@ -195,7 +196,7 @@ export default function VereinRundenprotokollTab({ verein }) {
                   <div className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">{row.gesamt}</div>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-2">
-                  {[["S1", row.s1],["S2", row.s2],["S3", row.s3],["S4", row.s4],["S5", row.s5],["S6", row.s6],["LL", row.ll],["SL", row.sl],["Ges", row.gesamt]].map(([label, value]) => (
+                  {[...seriesColumns(klasse).map(column => [column.label, row[column.key]]), ["LL", row.ll], ...(!isStudentClass(klasse) ? [["SL", row.sl]] : []), ["Ges", row.gesamt]].map(([label, value]) => (
                     <div key={label} className="rounded-2xl border border-zinc-200 bg-white px-2.5 py-2 text-center">
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{label}</div>
                       <div className="mt-1 text-sm font-semibold text-zinc-900">{value}</div>
@@ -213,9 +214,9 @@ export default function VereinRundenprotokollTab({ verein }) {
                   <th className="px-4 py-3">Platz</th>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Verein</th>
-                  {[1,2,3,4,5,6].map((serie) => <th key={serie} className="px-3 py-3 text-center">S{serie}</th>)}
+                  {seriesColumns(klasse).map((column) => <th key={column.key} className="px-3 py-3 text-center">{column.label}</th>)}
                   <th className="px-3 py-3 text-center">LL</th>
-                  <th className="px-3 py-3 text-center">SL</th>
+                  {!isStudentClass(klasse) && <th className="px-3 py-3 text-center">SL</th>}
                   <th className="px-3 py-3 text-center">Ges.</th>
                 </tr>
               </thead>
@@ -225,9 +226,9 @@ export default function VereinRundenprotokollTab({ verein }) {
                     <td className="px-4 py-3 font-semibold text-zinc-900">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium text-zinc-900">{row.vorname} {row.nachname}</td>
                     <td className="px-4 py-3 text-zinc-700">{row.verein || verein?.vereinsname || "–"}</td>
-                    {[row.s1,row.s2,row.s3,row.s4,row.s5,row.s6].map((value, serieIndex) => <td key={serieIndex} className="px-3 py-3 text-center">{value}</td>)}
+                    {seriesColumns(klasse).map(column => row[column.key]).map((value, serieIndex) => <td key={serieIndex} className="px-3 py-3 text-center">{value}</td>)}
                     <td className="px-3 py-3 text-center font-semibold">{row.ll}</td>
-                    <td className="px-3 py-3 text-center font-semibold">{row.sl}</td>
+                    {!isStudentClass(klasse) && <td className="px-3 py-3 text-center font-semibold">{row.sl}</td>}
                     <td className="px-3 py-3 text-center font-semibold text-zinc-900">{row.gesamt}</td>
                   </tr>
                 ))}

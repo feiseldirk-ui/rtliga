@@ -1,3 +1,4 @@
+import { seriesColumns, isStudentClass } from '../../../lib/seriesRules';
 import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -87,7 +88,7 @@ function RoundClass({ klasse, rows, roundNumber }) {
               <span className="rounded-xl bg-emerald-100 px-3 py-2 text-base font-bold text-emerald-800">{row.gesamt}</span>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
-              {[["S1", row.s1], ["S2", row.s2], ["S3", row.s3], ["S4", row.s4], ["S5", row.s5], ["S6", row.s6], ["LL", row.ll], ["SL", row.sl], ["Ges", row.gesamt]].map(([label, value]) => (
+              {[...seriesColumns(klasse).map(column => [column.label, row[column.key]]), ["LL", row.ll], ...(!isStudentClass(klasse) ? [["SL", row.sl]] : []), ["Ges", row.gesamt]].map(([label, value]) => (
                 <div key={label} className="rounded-xl border border-zinc-200 bg-white px-2 py-2 text-center">
                   <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">{label}</div>
                   <div className="mt-1 text-sm font-semibold text-zinc-900">{value}</div>
@@ -105,9 +106,9 @@ function RoundClass({ klasse, rows, roundNumber }) {
               <th className="px-4 py-3 text-left">Platz</th>
               <th className="px-4 py-3 text-left">Name</th>
               <th className="px-4 py-3 text-left">Verein</th>
-              {[1, 2, 3, 4, 5, 6].map((serie) => <th key={serie} className="px-3 py-3 text-center">S{serie}</th>)}
+              {seriesColumns(klasse).map((column) => <th key={column.key} className="px-3 py-3 text-center">{column.label}</th>)}
               <th className="px-3 py-3 text-center">LL</th>
-              <th className="px-3 py-3 text-center">SL</th>
+              {!isStudentClass(klasse) && <th className="px-3 py-3 text-center">SL</th>}
               <th className="px-3 py-3 text-center">Ges.</th>
             </tr>
           </thead>
@@ -117,9 +118,9 @@ function RoundClass({ klasse, rows, roundNumber }) {
                 <td className="px-4 py-3"><span className={`inline-flex min-w-8 justify-center rounded-full border px-2 py-1 text-xs font-semibold ${getPlaceClass(index)}`}>{index + 1}</span></td>
                 <td className="whitespace-nowrap px-4 py-3 font-semibold text-zinc-900">{row.vorname} {row.nachname}</td>
                 <td className="px-4 py-3 text-zinc-600">{row.verein || "–"}</td>
-                {[row.s1, row.s2, row.s3, row.s4, row.s5, row.s6].map((value, serieIndex) => <td key={serieIndex} className="px-3 py-3 text-center">{value}</td>)}
+                {seriesColumns(klasse).map(column => row[column.key]).map((value, serieIndex) => <td key={serieIndex} className="px-3 py-3 text-center">{value}</td>)}
                 <td className="px-3 py-3 text-center font-semibold">{row.ll}</td>
-                <td className="px-3 py-3 text-center font-semibold">{row.sl}</td>
+                {!isStudentClass(klasse) && <td className="px-3 py-3 text-center font-semibold">{row.sl}</td>}
                 <td className="px-3 py-3 text-center font-bold text-emerald-700">{row.gesamt}</td>
               </tr>
             ))}

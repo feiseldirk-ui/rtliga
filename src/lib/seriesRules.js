@@ -6,3 +6,12 @@ export function seriesTotals(row, category) {
   const sl = student ? 0 : values.slice(3).reduce((a, b) => a + b, 0);
   return { ll, sl, gesamt: ll + sl };
 }
+
+// Display labels only; storage keys s1-s6 stay stable for existing results.
+export function seriesLabel(index, category, english = false) {
+  const slow = isStudentClass(category) || index < 3;
+  return `${english ? (slow ? 'Slow' : 'Fast') : (slow ? 'LL' : 'SL')} ${slow ? index + 1 : index - 2}`;
+}
+export function seriesColumns(category) {
+  return Array.from({ length: isStudentClass(category) ? 4 : 6 }, (_, i) => ({ key: `s${i+1}`, label: seriesLabel(i, category) }));
+}

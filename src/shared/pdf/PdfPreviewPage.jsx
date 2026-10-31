@@ -233,7 +233,7 @@ export default function PdfPreviewPage({
   const normalizedClasses = mode === "overall" ? classes.map(([name, rows]) => [name, normalizeOverallRows(rows)]) : classes;
   const highlight = (field) => (activeField === field ? "ring-2 ring-violet-400 bg-violet-50/60" : "");
   const isOverallMode = mode === "overall";
-  const roundHeaders = ["S1", "S2", "S3", "S4", "S5", "S6", "LL", "SL", "Gesamt"];
+  const roundHeaders = ["LL 1", "LL 2", "LL 3", "SL 1", "SL 2", "SL 3", "LL", "SL", "Gesamt"];
   const pageLabel = `Seite ${pageIndex + 1} / ${pageCount}`;
 
   return (
@@ -278,7 +278,7 @@ export default function PdfPreviewPage({
               const tableRows = isOverallMode ? normalizeOverallRows(rows) : rows;
               const valueColumns = isOverallMode
                 ? Array.from({ length: 9 }, (_, index) => ({ key: `wk-${index + 1}`, label: `WK${index + 1}` }))
-                : (studentRound ? ['S1', 'S2', 'S3', 'S4', 'LL', 'Gesamt'] : roundHeaders).map((label) => ({ key: label.toLowerCase(), label }));
+                : (studentRound ? ['LL 1', 'LL 2', 'LL 3', 'LL 4', 'LL', 'Gesamt'] : roundHeaders).map((label) => ({ key: label.toLowerCase(), label }));
               const nameColumnWidth = isOverallMode ? "w-[84px]" : showClubColumn ? "w-[102px]" : "w-[118px]";
               const clubColumnWidth = isOverallMode ? "w-[126px]" : "w-[154px]";
               const valueColumnWidth = isOverallMode ? "w-[42px]" : showClubColumn ? "w-[36px]" : "w-[43px]";
