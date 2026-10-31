@@ -11,6 +11,8 @@ import ArchivTab from "./ArchivTab";
 import RundenprotokollTab from "./RundenprotokollTab";
 import AdminManagementTab from "./AdminManagementTab";
 import FeedbackTab from "./FeedbackTab";
+import KorrekturenTab from "./KorrekturenTab";
+import AenderungsprotokollTab from "./AenderungsprotokollTab";
 import MediaPanel from "../../../shared/ui/dashboard/MediaPanel";
 import { getActiveSeason, seasonOrNullFilter } from "../../../lib/seasonScope";
 import BrandMark from "../../../shared/ui/BrandMark";
@@ -45,6 +47,8 @@ function AdminDashboard({ adminEmail, logout }) {
       { key: "zeitfenster", label: "Zeitfenster", title: "Wettkampffenster verwalten", description: "Start- und Endzeiten für alle 9 Wettkämpfe zentral steuern." },
       { key: "protokoll", label: "Rundenprotokoll", title: "Rundenergebnisse & PDF-Protokolle", description: "Rundenweise Ergebnisse nach Vorlage anzeigen und als PDF exportieren." },
       { key: "ergebnisse", label: "Gesamtergebnisse", title: "Ligaauswertung", description: "Gesamtergebnisse je Altersklasse prüfen und exportieren." },
+      { key: "korrekturen", label: "Korrekturen", title: "Ergebnisse, Namen und Klassen korrigieren", description: "Begründete Admin-Korrekturen mit dokumentierten alten und neuen Werten." },
+      { key: "aenderungen", label: "Änderungsprotokoll", title: "Protokoll aller Admin-Korrekturen", description: "Korrekturen prüfen, durchsuchen und als eigenes PDF exportieren." },
       { key: "pdf", label: "PDF-Editor", title: "PDF-Vorlagen und Vorschau", description: "Logos, Titel, Qualifikationslinie und freie Textfelder direkt in der Vorschau anpassen." },
       { key: "archiv", label: "Archiv", title: "Archiv & Saisonwechsel", description: "Neue Saison absichern und Archivierung vorbereiten." },
       { key: "meldungen", label: "Meldungen", title: "Fehler und Hinweise", description: "Meldungen der Vereine prüfen, beantworten und für eine Anpassung vorbereiten." },
@@ -174,6 +178,8 @@ function AdminDashboard({ adminEmail, logout }) {
           {activeTab === "zeitfenster" ? <ZeitfensterTab onRefreshStats={ladeDashboardStats} /> : null}
           {activeTab === "protokoll" ? <RundenprotokollTab /> : null}
           {activeTab === "ergebnisse" ? <ErgebnisseTab /> : null}
+          {activeTab === "korrekturen" ? <KorrekturenTab /> : null}
+          {activeTab === "aenderungen" ? <AenderungsprotokollTab /> : null}
           {activeTab === "pdf" ? <SaisonPdfTab /> : null}
           {activeTab === "archiv" ? <ArchivTab /> : null}
           {activeTab === "meldungen" ? <FeedbackTab /> : null}

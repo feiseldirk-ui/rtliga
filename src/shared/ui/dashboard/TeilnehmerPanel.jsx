@@ -55,7 +55,6 @@ export default function TeilnehmerPanel({
   onAdd,
   onUpdate,
   onCancelEdit,
-  onEdit,
   onDelete,
   gesperrtFn,
   altersklassen = [],
@@ -267,7 +266,7 @@ export default function TeilnehmerPanel({
                             </span>
                           ) : (
                             <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                              Änderbar
+                              Gemeldet
                             </span>
                           )}
                         </td>
@@ -275,17 +274,11 @@ export default function TeilnehmerPanel({
                         <td className="px-4 py-4 text-sm">
                           {locked ? (
                             <span className="text-zinc-500">
-                              Ergebnisse sind erfasst – Änderungen an den Teilnehmerdaten sind nicht mehr möglich.
+                              Korrekturen an Namen und Klassen bitte beim Admin melden.
                             </span>
                           ) : (
                             <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                className="btn-mini"
-                                onClick={() => onEdit?.(t)}
-                              >
-                                Bearbeiten
-                              </button>
+                              <span className="text-zinc-500">Name und Klasse kann nur der Admin korrigieren.</span>
 
                               <button
                                 type="button"

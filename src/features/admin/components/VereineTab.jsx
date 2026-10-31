@@ -244,8 +244,8 @@ const VereineTab = ({ onRefreshStats }) => {
       setEditError("Vorname, Nachname und Altersklasse müssen ausgefüllt sein.");
       return;
     }
-    if (!bemerkung) {
-      setEditError("Bitte eine Bemerkung bzw. den Grund der Änderung eintragen.");
+    if (bemerkung.length < 5 || bemerkung.length > 2000) {
+      setEditError("Bitte den Grund der Änderung mit 5 bis 2000 Zeichen beschreiben.");
       return;
     }
 
@@ -287,7 +287,7 @@ const VereineTab = ({ onRefreshStats }) => {
       window.dispatchEvent(new CustomEvent("rtliga-admin-refresh"));
     } catch (error) {
       console.error("Teilnehmerkorrektur fehlgeschlagen:", error);
-      setEditError("Die Teilnehmerdaten konnten nicht gespeichert werden. Bitte Admin-Sitzung prüfen und erneut versuchen.");
+      setEditError(error.message || "Die Teilnehmerdaten konnten nicht gespeichert werden. Bitte Admin-Sitzung prüfen und erneut versuchen.");
     } finally {
       setEditSaving(false);
     }
@@ -604,7 +604,7 @@ const VereineTab = ({ onRefreshStats }) => {
                     {auditRows.map((row) => (
                       <tr key={row.id} className="align-top">
                         <td className="whitespace-nowrap px-4 py-3 text-zinc-600">{formatAuditDate(row.created_at)}</td>
-                        <td className="px-4 py-3"><span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs font-semibold">{row.entity_type === "teilnehmer" ? `Teilnehmer #${row.teilnehmer_id}` : "Verein"}</span></td>
+                        <td className="px-4 py-3"><span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs font-semibold">{row.entity_type === "teilnehmer" ? `Teilnehmer #${row.teilnehmer_id}` : row.entity_type === "ergebnis" ? `Ergebnis #${row.entity_id}` : "Verein"}</span></td>
                         <td className="px-4 py-3 font-medium text-zinc-800">{row.field_name}</td>
                         <td className="px-4 py-3 text-zinc-600">{row.old_value || "–"}</td>
                         <td className="px-4 py-3 font-medium text-zinc-900">{row.new_value || "–"}</td>
