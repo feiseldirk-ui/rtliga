@@ -1,3 +1,4 @@
+import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { waitForSession } from "../../../lib/authReady";
@@ -180,11 +181,11 @@ export default function RundenprotokollTab() {
           <div className="flex flex-col gap-3 xl:items-end">
             <div className="flex flex-wrap items-center gap-3">
               <label className="text-sm font-semibold text-zinc-700">Wettkampf</label>
-              <select value={roundNumber} onChange={(e) => setRoundNumber(Number(e.target.value))} className="input w-36">
+              <AppSelect value={roundNumber} onChange={(e) => setRoundNumber(Number(e.target.value))} className="input w-36">
                 {Array.from({ length: 9 }, (_, i) => i + 1).map((wk) => (
                   <option key={wk} value={wk} disabled={!roundsWithEntries.includes(wk)}>WK {wk}{roundsWithEntries.includes(wk) ? "" : " · leer"}</option>
                 ))}
-              </select>
+              </AppSelect>
               <button type="button" onClick={() => setRoundNumber(roundsWithEntries[roundsWithEntries.length - 1] || 1)} className="btn btn-secondary">Neueste Runde</button>
               <button type="button" onClick={handleDownload} className="btn btn-secondary">PDF herunterladen</button>
             </div>

@@ -1,3 +1,4 @@
+import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { createXlsxWorkbook } from "../../../lib/xlsxExport";
@@ -321,7 +322,7 @@ const ErgebnisseTab = () => {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <select
+            <AppSelect
               value={exportFormat}
               onChange={(e) => setExportFormat(e.target.value)}
               className="input min-w-[150px] py-2.5"
@@ -329,7 +330,7 @@ const ErgebnisseTab = () => {
               <option value="xlsx">XLSX</option>
               <option value="csv">CSV</option>
               <option value="pdf">PDF</option>
-            </select>
+            </AppSelect>
 
             <button onClick={handleExport} className="btn btn-secondary">
               Exportieren

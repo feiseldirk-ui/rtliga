@@ -1,3 +1,4 @@
+import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { waitForSession } from "../../../lib/authReady";
 import supabase from "../../../lib/supabase/client";
@@ -414,9 +415,9 @@ const VereineTab = ({ onRefreshStats }) => {
               </button>
               <label className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600">
                 Altersklasse
-                <select value={ageFilter} onChange={(event) => setAgeFilter(event.target.value)} className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold text-zinc-700 outline-none">
+                <AppSelect value={ageFilter} onChange={(event) => setAgeFilter(event.target.value)} className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold text-zinc-700 outline-none">
                   {ageOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
+                </AppSelect>
               </label>
               <div className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">geöffnet</div>
             </div>
@@ -455,10 +456,10 @@ const VereineTab = ({ onRefreshStats }) => {
                           </td>
                           <td>
                             {editing ? (
-                              <select className="input min-w-[170px]" value={editForm.altersklasse} onChange={(event) => setEditForm((prev) => ({ ...prev, altersklasse: event.target.value }))}>
+                              <AppSelect className="input min-w-[170px]" value={editForm.altersklasse} onChange={(event) => setEditForm((prev) => ({ ...prev, altersklasse: event.target.value }))}>
                                 <option value="">Altersklasse wählen</option>
                                 {editAgeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                              </select>
+                              </AppSelect>
                             ) : (
                               <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">{t.altersklasse}</span>
                             )}

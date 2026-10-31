@@ -1,3 +1,4 @@
+import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import supabase from '../../../lib/supabase/client';
@@ -48,7 +49,7 @@ export default function AenderungsprotokollTab() {
   }
   return <div className="space-y-4">
     <p className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">Nur für Admins: Jede dokumentierte Korrektur enthält Zeitpunkt, Bearbeiter, Begründung sowie alten und neuen Wert. Protokolleinträge können hier weder verändert noch gelöscht werden.</p>
-    <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-semibold">Suche (Name, Verein, Saison, Grund, Admin)<input className="input mt-1" value={query} onChange={e => setQuery(e.target.value)} /></label><label className="text-sm font-semibold">Bereich<select className="input mt-1" value={type} onChange={e => setType(e.target.value)}><option value="alle">Alle Änderungen</option><option value="ergebnis">Ergebnisse</option><option value="teilnehmer">Namen und Klassen</option><option value="verein">Vereinsnamen</option></select></label></div>
+    <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-semibold">Suche (Name, Verein, Saison, Grund, Admin)<input className="input mt-1" value={query} onChange={e => setQuery(e.target.value)} /></label><label className="text-sm font-semibold">Bereich<AppSelect className="input mt-1" value={type} onChange={e => setType(e.target.value)}><option value="alle">Alle Änderungen</option><option value="ergebnis">Ergebnisse</option><option value="teilnehmer">Namen und Klassen</option><option value="verein">Vereinsnamen</option></AppSelect></label></div>
     <div className="flex flex-wrap items-center gap-3"><button className="btn btn-secondary" disabled={busy} onClick={() => load()}>Aktualisieren</button><button className="btn btn-secondary" disabled={!filtered.length || busy} onClick={exportPdf}>Angezeigtes Protokoll als PDF</button><span className="text-sm text-zinc-500">{filtered.length} angezeigt · {rows.length} geladen</span></div>
     {error && <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-rose-800">{error}</p>}
     {!busy && !rows.length && !error && <p className="rounded-2xl bg-zinc-50 p-4 text-zinc-600">Noch keine Korrekturen dokumentiert.</p>}

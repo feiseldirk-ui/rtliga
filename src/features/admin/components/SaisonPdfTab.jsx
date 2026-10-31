@@ -1,3 +1,4 @@
+import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import PdfPreviewPage from "../../../shared/pdf/PdfPreviewPage";
 import {
@@ -123,7 +124,7 @@ function SelectedElementPanel({ element, onChange, onDelete, onUpload, onAlignFi
             <GeneralInput label="Schriftgröße" type="number" value={element.fontSize} onChange={(event) => onChange({ fontSize: Number(event.target.value || 0) })} />
             <label className="block space-y-1">
               <span className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Schriftart</span>
-              <select
+              <AppSelect
                 className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
                 value={element.fontFamily}
                 onChange={(event) => onChange({ fontFamily: event.target.value })}
@@ -131,7 +132,7 @@ function SelectedElementPanel({ element, onChange, onDelete, onUpload, onAlignFi
                 {FONT_OPTIONS.map((font) => (
                   <option key={font} value={font}>{font}</option>
                 ))}
-              </select>
+              </AppSelect>
             </label>
           </div>
           <div className="space-y-2">
@@ -460,7 +461,7 @@ export default function SaisonPdfTab() {
             {previewMode === "round" ? (
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-500">
                 <span>Vorschau-Runde</span>
-                <select
+                <AppSelect
                   className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-800"
                   value={previewRoundNumber}
                   onChange={(event) => setPreviewRoundNumber(Number(event.target.value))}
@@ -468,7 +469,7 @@ export default function SaisonPdfTab() {
                   {Array.from({ length: 9 }, (_, i) => i + 1).map((wk) => (
                     <option key={wk} value={wk}>Runde {wk}</option>
                   ))}
-                </select>
+                </AppSelect>
               </label>
             ) : null}
           </div>

@@ -1,3 +1,4 @@
+import AppSelect from '../AppSelect';
 import React, { useMemo, useState } from "react";
 
 const SECTION_CARD =
@@ -160,7 +161,7 @@ export default function TeilnehmerPanel({
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-zinc-700">Altersklasse</label>
-              <select
+              <AppSelect
                 value={form.altersklasse}
                 onChange={(e) =>
                   setForm((prev) => ({
@@ -178,7 +179,7 @@ export default function TeilnehmerPanel({
                     {ak}
                   </option>
                 ))}
-              </select>
+              </AppSelect>
             </div>
 
             <div className="flex gap-2 xl:pb-[1px]">

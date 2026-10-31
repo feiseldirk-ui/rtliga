@@ -1,3 +1,4 @@
+import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { waitForSession } from "../../../lib/authReady";
@@ -157,9 +158,9 @@ export default function VereinRundenprotokollTab({ verein }) {
             <p className="mt-2 max-w-3xl text-sm text-zinc-600 sm:text-base">Angezeigt werden nur bereits geschlossene Runden. Der PDF-Download enthält Serien 1–6 sowie LL, SL und Gesamtergebnis.</p>
           </div>
           <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-center">
-            <select value={roundNumber} onChange={(e) => setRoundNumber(Number(e.target.value))} className="input w-full sm:w-44">
+            <AppSelect value={roundNumber} onChange={(e) => setRoundNumber(Number(e.target.value))} className="input w-full sm:w-44">
               {closedRounds.map((wk) => <option key={wk} value={wk} disabled={!closedRoundsWithEntries.includes(wk)}>WK {wk}{closedRoundsWithEntries.includes(wk) ? "" : " · ohne Eintrag"}</option>)}
-            </select>
+            </AppSelect>
             <button type="button" onClick={() => setRoundNumber(closedRoundsWithEntries[closedRoundsWithEntries.length - 1] || 1)} className="btn btn-secondary w-full sm:w-auto">Neueste Runde</button>
             <button type="button" onClick={handleDownload} className="btn btn-secondary w-full sm:w-auto">PDF herunterladen</button>
           </div>

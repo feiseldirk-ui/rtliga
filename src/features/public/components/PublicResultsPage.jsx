@@ -1,3 +1,4 @@
+import AppSelect from '../../../shared/ui/AppSelect';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import supabase from "../../../lib/supabase/client";
@@ -178,9 +179,9 @@ function PublicRounds({ entries, rounds, season }) {
             </p>
           </div>
           <div className="grid gap-3 sm:flex sm:flex-wrap">
-            <select value={roundNumber} onChange={(event) => setRoundNumber(Number(event.target.value))} className="input sm:w-44" aria-label="Wettkampfrunde auswählen">
+            <AppSelect value={roundNumber} onChange={(event) => setRoundNumber(Number(event.target.value))} className="input sm:w-44" aria-label="Wettkampfrunde auswählen">
               {rounds.map((round) => <option key={round} value={round}>WK {round}</option>)}
-            </select>
+            </AppSelect>
             <button type="button" onClick={() => setRoundNumber(rounds.at(-1))} className="btn btn-secondary">Neueste Runde</button>
             <button type="button" onClick={download} disabled={exporting} className="btn border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-500">
               <DownloadIcon /> {exporting ? "PDF wird erstellt…" : "PDF herunterladen"}

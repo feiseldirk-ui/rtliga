@@ -1,3 +1,4 @@
+import AppSelect from './AppSelect';
 import React, { useId, useRef, useState } from "react";
 import { calendarCells, dateKey, pad2, selectionError } from "../../lib/dateTimeSelection";
 
@@ -76,16 +77,16 @@ export default function DateTimePicker({ label, value, revision, disabled, onCha
             </div>
             <div className="grid grid-cols-2 gap-3">
               <label className="text-sm font-semibold">Stunde
-                <select value={hour} onChange={event => { setHour(event.target.value); setError(""); }} className="input mt-1 w-full" aria-label="Stunde">
+                <AppSelect value={hour} onChange={event => { setHour(event.target.value); setError(""); }} className="input mt-1 w-full" aria-label="Stunde">
                   <option value="">Bitte wählen</option>
                   {Array.from({ length: 24 }, (_, h) => <option key={h} value={pad2(h)}>{pad2(h)}</option>)}
-                </select>
+                </AppSelect>
               </label>
               <label className="text-sm font-semibold">Minute
-                <select value={minute} onChange={event => { setMinute(event.target.value); setError(""); }} className="input mt-1 w-full" aria-label="Minute">
+                <AppSelect value={minute} onChange={event => { setMinute(event.target.value); setError(""); }} className="input mt-1 w-full" aria-label="Minute">
                   <option value="">Bitte wählen</option>
                   {Array.from({ length: 60 }, (_, m) => <option key={m} value={pad2(m)}>{pad2(m)}</option>)}
-                </select>
+                </AppSelect>
               </label>
             </div>
             <p className="rounded-xl bg-indigo-50 p-3 text-sm font-normal text-indigo-900" role="status">
