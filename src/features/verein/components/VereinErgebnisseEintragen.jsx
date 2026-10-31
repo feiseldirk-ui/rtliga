@@ -1,3 +1,4 @@
+import { sanitizeSerieValue } from '../../../lib/seriesInput';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../../../lib/supabase/client";
 import { waitForSession } from "../../../lib/authReady";
@@ -35,12 +36,6 @@ function parseNumber(text, key) {
 function parseStatus(text) {
   const match = String(text || "").match(/Status=(.*)$/i);
   return match?.[1]?.trim() || "";
-}
-
-function sanitizeSerieValue(value) {
-  const clean = String(value ?? "").replace(/\D/g, "").slice(0, 3);
-  if (clean === "") return "";
-  return String(Math.min(Number(clean), 100));
 }
 
 function calcLL(wk) {
