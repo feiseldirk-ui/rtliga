@@ -883,7 +883,7 @@ export default function VereinErgebnisseEintragen({ onBack, verein, refreshTeiln
                                 Langsamlauf {isStudentClass(t.altersklasse) ? '(2 × 2 Serien, maximal 400 Ringe)' : ''}
                               </div>
 
-                              <div className="grid grid-cols-3 gap-2">
+                              <div className={`grid ${isStudentClass(t.altersklasse) ? "grid-cols-2" : "grid-cols-3"} gap-2`}>
                                 {(isStudentClass(t.altersklasse) ? ["s1", "s2", "s3", "s4"] : ["s1", "s2", "s3"]).map((key, idx) => (
                                   <div key={key}>
                                     <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
