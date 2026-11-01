@@ -181,6 +181,30 @@ export default function HomePage() {
           </section>
         </div>
 
+
+        <section className="mx-5 mb-5 rounded-[26px] border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-blue-50 p-5 sm:mx-8 sm:mb-7 sm:p-7" aria-labelledby="game-heading">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <circle cx="13" cy="12" r="8" /><circle cx="13" cy="12" r="4" /><circle cx="13" cy="12" r="1" />
+                  <path d="M1 7h4M1 12h3M1 17h4" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div>
+                <h2 id="game-heading" className="text-xl font-bold text-slate-900">Laufende Scheibe ausprobieren</h2>
+                <p className="mt-2 max-w-lg text-sm leading-6 text-slate-600">Entdecke die Disziplin spielerisch: Starte das Laufende-Scheibe-Spiel direkt im Browser – auf dem Handy oder am Computer.</p>
+              </div>
+            </div>
+            <div className="shrink-0 sm:w-48">
+              <a href="https://laufende-scheibe-spiel.df0776.chatgpt.site" target="_blank" rel="noopener noreferrer" className="flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl bg-violet-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-600">
+                Spiel starten <span aria-hidden="true">↗</span><span className="sr-only"> (öffnet in neuem Tab)</span>
+              </a>
+              <p className="mt-2 text-center text-xs leading-5 text-slate-500">Ohne Anmeldung · neuer Tab</p>
+            </div>
+          </div>
+        </section>
+
         <footer className="mx-5 mb-5 flex items-start gap-3 rounded-2xl bg-gradient-to-r from-blue-50 to-emerald-50 px-4 py-4 sm:mx-8 sm:mb-8 sm:px-5">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm">
             <Icon name="shield" className="h-5 w-5" />
