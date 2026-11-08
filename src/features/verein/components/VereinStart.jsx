@@ -585,15 +585,6 @@ export default function VereinStart() {
               WK-Zeitfenster
             </button>
 
-            <button
-              type="button"
-              onClick={() => setFeedbackOpen(true)}
-              className="shrink-0 whitespace-nowrap rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-100"
-            >
-              <span className="mr-1.5" aria-hidden="true">✎</span>
-              Fehler oder Hinweis
-            </button>
-
             {/* Stats mobil – ganz rechts in der Tab-Zeile */}
             <div className="ml-auto flex md:hidden items-center gap-1 shrink-0 pl-2">
               <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
@@ -664,6 +655,16 @@ export default function VereinStart() {
         onCancel={handleModalCancel}
         busy={unsavedActionBusy}
       />
+
+      <button
+        type="button"
+        onClick={() => setFeedbackOpen(true)}
+        className="fixed bottom-4 right-4 z-30 inline-flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-[0_12px_32px_rgba(15,23,42,0.32)] transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:translate-y-0 sm:bottom-6 sm:right-6"
+        aria-label="Fehler oder Hinweis melden"
+      >
+        <span aria-hidden="true">✎</span>
+        <span>Fehler oder Hinweis melden</span>
+      </button>
 
       <FeedbackDialog
         open={feedbackOpen}
