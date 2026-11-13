@@ -24,6 +24,7 @@ function friendlyError(error) {
   if (error?.code === "55P03") return "Ein anderer Speichervorgang läuft noch. Bitte kurz warten und den gespeicherten Stand neu laden. Dein Entwurf bleibt erhalten.";
   if (error?.code === "23P01") return "Überschneidung: Ein anderer WK ist in diesem Zeitraum bereits geöffnet. Bitte gespeicherten Stand laden und Zeiten anpassen.";
   if (error?.code === "PGRST202") return "Die neue Zeitfenster-Funktion ist in Supabase noch nicht eingerichtet. Bitte zuerst das zugehörige SQL installieren.";
+  if (error?.code === "42501" && /permission denied for table/i.test(error?.message || "")) return "Technischer Datenbankfehler beim Speichern. Deine Admin-Anmeldung ist weiterhin aktiv. Bitte den Fehler melden.";
   if (error?.code === "42501") return "Keine Adminberechtigung oder Anmeldung abgelaufen. Bitte erneut anmelden.";
   if (/abort|fetch|network|timeout/i.test(error?.message || "")) return "Keine Speicherbestätigung erhalten. Bitte den gespeicherten Stand neu laden und prüfen, bevor du erneut speicherst.";
   return error?.message || "Speichern konnte nicht bestätigt werden. Dein Entwurf bleibt erhalten.";
